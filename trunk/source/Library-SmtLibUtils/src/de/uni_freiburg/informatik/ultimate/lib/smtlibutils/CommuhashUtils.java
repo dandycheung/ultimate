@@ -78,9 +78,13 @@ public class CommuhashUtils {
 	}
 
 	public static Term[] sortByHashCode(final Term... params) {
-		final Term[] sortedParams = params.clone();
-		Arrays.sort(sortedParams, HASH_BASED_COMPERATOR);
-		return sortedParams;
+
+//		Disable sorting in order to benchmark the absence of a CommuHashNormalForm
+//		final Term[] sortedParams = params.clone();
+//		Arrays.sort(sortedParams, HASH_BASED_COMPERATOR);
+//		return sortedParams;
+
+		return params;
 	}
 
 	public static Term term(final Script script, final String funcname, final String[] indices, final Sort returnSort,
