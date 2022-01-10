@@ -41,6 +41,7 @@ import de.uni_freiburg.informatik.ultimate.automata.petrinet.ITransition;
 import de.uni_freiburg.informatik.ultimate.automata.petrinet.Marking;
 import de.uni_freiburg.informatik.ultimate.automata.petrinet.PetriNetNot1SafeException;
 import de.uni_freiburg.informatik.ultimate.automata.petrinet.netdatastructures.Transition;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.ImmutableSet;
 
 /**
  * Event of a {@link BranchingProcess}.
@@ -92,7 +93,7 @@ public final class Event<LETTER, PLACE> implements Serializable {
 	 *            homomorphism transition
 	 */
 	public Event(final Collection<Condition<LETTER, PLACE>> predecessors, final ITransition<LETTER, PLACE> transition,
-			final BranchingProcess<LETTER, PLACE> bp) throws PetriNetNot1SafeException {
+			final BranchingProcess<LETTER, PLACE> bp, final int hashCode) throws PetriNetNot1SafeException {
 		assert conditionToPlaceEqual(predecessors,
 				bp.getNet().getPredecessors(transition)) : "An event was created with inappropriate predecessors.\n  "
 						+ "transition: " + transition.toString() + "\n  events predecessors: " + predecessors.toString()
@@ -106,7 +107,7 @@ public final class Event<LETTER, PLACE> implements Serializable {
 		for (final PLACE p : bp.getNet().getSuccessors(transition)) {
 			mSuccessors.add(bp.constructCondition(this, p));
 		}
-		mHashCode = computeHashCode();
+		mHashCode = hashCode;
 
 		final Set<Condition<LETTER, PLACE>> conditionMarkSet = new HashSet<>();
 		mDepth = 0;
@@ -152,7 +153,7 @@ public final class Event<LETTER, PLACE> implements Serializable {
 	public Event(final BranchingProcess<LETTER, PLACE> bp) {
 		mTransition = null;
 		mLocalConfiguration = new Configuration<>(new HashSet<Event<LETTER, PLACE>>(),0);
-		mMark = new Marking<LETTER, PLACE>(bp.getNet().getInitialPlaces());
+		mMark = new Marking<>(ImmutableSet.of(bp.getNet().getInitialPlaces()));
 		final Set<Condition<LETTER, PLACE>> conditionMarkSet = new HashSet<>();
 		mConditionMark = new ConditionMarking<>(conditionMarkSet);
 		mPredecessors = new HashSet<>();
@@ -162,7 +163,7 @@ public final class Event<LETTER, PLACE> implements Serializable {
 			mSuccessors.add(c);
 			conditionMarkSet.add(c);
 		}
-		mHashCode = computeHashCode();
+		mHashCode = 0;
 		mPlaceCorelationMap = new HashMap<>();
 		if (bp.getNewFiniteComprehensivePrefixMode()) {
 			computePlaceCorelationMap(bp);

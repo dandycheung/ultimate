@@ -27,6 +27,7 @@
 package de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,20 +36,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.IIcfgSymbolTable;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.UnmodifiableTransFormula.Infeasibility;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.variables.IProgramConst;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.variables.IProgramVar;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.variables.IProgramVarOrConst;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.variables.ProgramVarUtils;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.ConstantFinder;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.IPredicate;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.TermVarsProc;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.scripttransfer.TermTransferrer;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.ManagedScript;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtUtils;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.Substitution;
 import de.uni_freiburg.informatik.ultimate.logic.ApplicationTerm;
 import de.uni_freiburg.informatik.ultimate.logic.Term;
 import de.uni_freiburg.informatik.ultimate.logic.TermVariable;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.ImmutableSet;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.BaseTuple;
 
 /**
  * An object of this class allows one to construct a {@link UnmodifiableTransFormula}. {@link UnmodifiableTransFormula}s
@@ -77,7 +85,6 @@ public class TransFormulaBuilder {
 			final Map<IProgramVar, TermVariable> outVars, final boolean emptyNonTheoryConsts,
 			final Set<IProgramConst> nonTheoryConsts, final boolean emptyBranchEncoders,
 			final Collection<TermVariable> branchEncoders, final boolean emptyAuxVars) {
-		super();
 		if (inVars == null) {
 			mInVars = new HashMap<>();
 		} else {
@@ -89,30 +96,29 @@ public class TransFormulaBuilder {
 			mOutVars = new HashMap<>(outVars);
 		}
 		if (emptyNonTheoryConsts) {
-			mNonTheoryConsts = Collections.emptySet();
-		} else {
-			if (nonTheoryConsts == null) {
-				mNonTheoryConsts = new HashSet<>();
-			} else {
-				mNonTheoryConsts = new HashSet<>(nonTheoryConsts);
+			mNonTheoryConsts = ImmutableSet.empty();
+			if (nonTheoryConsts != null && !nonTheoryConsts.isEmpty()) {
+				throw new IllegalArgumentException("if emptyNonTheoryConsts=true, you cannot provide nonTheoryConsts");
 			}
+		} else if (nonTheoryConsts == null) {
+			mNonTheoryConsts = new HashSet<>();
+		} else {
+			mNonTheoryConsts = new HashSet<>(nonTheoryConsts);
 		}
 		if (emptyAuxVars) {
-			mAuxVars = Collections.emptySet();
+			mAuxVars = ImmutableSet.empty();
 		} else {
 			mAuxVars = new HashSet<>();
 		}
 		if (emptyBranchEncoders) {
-			mBranchEncoders = Collections.emptySet();
+			mBranchEncoders = ImmutableSet.empty();
 			if (branchEncoders != null && !branchEncoders.isEmpty()) {
 				throw new IllegalArgumentException("if emptyBranchEncoders=true, you cannot provide branchEncoders");
 			}
+		} else if (branchEncoders == null) {
+			mBranchEncoders = new HashSet<>();
 		} else {
-			if (branchEncoders == null) {
-				mBranchEncoders = new HashSet<>();
-			} else {
-				mBranchEncoders = new HashSet<>(branchEncoders);
-			}
+			mBranchEncoders = new HashSet<>(branchEncoders);
 		}
 	}
 
@@ -142,7 +148,7 @@ public class TransFormulaBuilder {
 			addAuxVar(newAuxVar);
 			substitutionMapping.put(auxVar, newAuxVar);
 		}
-		mFormula = new Substitution(script, substitutionMapping).transform(mFormula);
+		mFormula = Substitution.apply(script, substitutionMapping, mFormula);
 	}
 
 	public boolean removeAuxVar(final TermVariable arg0) {
@@ -242,22 +248,20 @@ public class TransFormulaBuilder {
 		if (mConstructionFinished) {
 			throw new IllegalStateException("Construction finished, TransFormula must not be modified.");
 		}
-		if (mInfeasibility == null) {
-			mInfeasibility = infeasibility;
-		} else {
+		if (mInfeasibility != null) {
 			throw new IllegalStateException("Infeasibility already set.");
 		}
+		mInfeasibility = infeasibility;
 	}
 
 	public void setFormula(final Term formula) {
 		if (mConstructionFinished) {
 			throw new IllegalStateException("Construction finished, TransFormula must not be modified.");
 		}
-		if (mFormula == null) {
-			mFormula = formula;
-		} else {
+		if (mFormula != null) {
 			throw new IllegalStateException("Formula already set.");
 		}
+		mFormula = formula;
 	}
 
 	public UnmodifiableTransFormula finishConstruction(final ManagedScript script) {
@@ -268,9 +272,47 @@ public class TransFormulaBuilder {
 			throw new IllegalStateException("cannot finish without feasibility status");
 		}
 		mConstructionFinished = true;
-		UnmodifiableTransFormula.removeSuperfluousVars(mFormula, mInVars, mOutVars, mAuxVars);
-		return new UnmodifiableTransFormula(mFormula, mInVars, mOutVars, mNonTheoryConsts, mAuxVars, mBranchEncoders,
-				mInfeasibility, script);
+		removeSuperfluousVars(mFormula, mInVars, mOutVars, mAuxVars);
+		return new UnmodifiableTransFormula(mFormula, Collections.unmodifiableMap(mInVars),
+				Collections.unmodifiableMap(mOutVars), ImmutableSet.of(mNonTheoryConsts), ImmutableSet.of(mAuxVars),
+				ImmutableSet.of(mBranchEncoders), mInfeasibility, script);
+	}
+
+	/**
+	 * Remove inVars, outVars and auxVars that are not necessary. Remove auxVars if it does not occur in the formula.
+	 * Remove inVars if it does not occur in the formula. Remove outVar if it does not occur in the formula and is also
+	 * an inVar (case where the var is not modified). Note that we may not generally remove outVars that do not occur in
+	 * the formula (e.g., TransFormula for havoc statement).
+	 */
+	private static void removeSuperfluousVars(final Term formula, final Map<IProgramVar, TermVariable> inVars,
+			final Map<IProgramVar, TermVariable> outVars, final Set<TermVariable> auxVars) {
+		final Set<TermVariable> allVars = new HashSet<>(Arrays.asList(formula.getFreeVars()));
+		if (!auxVars.isEmpty()) {
+			auxVars.retainAll(allVars);
+		}
+		final List<IProgramVar> superfluousInVars = new ArrayList<>();
+		final List<IProgramVar> superfluousOutVars = new ArrayList<>();
+		for (final Entry<IProgramVar, TermVariable> bv : inVars.entrySet()) {
+			final TermVariable inVar = bv.getValue();
+			if (!allVars.contains(inVar)) {
+				superfluousInVars.add(bv.getKey());
+			}
+		}
+		for (final Entry<IProgramVar, TermVariable> bv : outVars.entrySet()) {
+			final TermVariable outVar = bv.getValue();
+			if (!allVars.contains(outVar)) {
+				final TermVariable inVar = inVars.get(bv.getKey());
+				if (outVar == inVar) {
+					superfluousOutVars.add(bv.getKey());
+				}
+			}
+		}
+		for (final IProgramVar bv : superfluousInVars) {
+			inVars.remove(bv);
+		}
+		for (final IProgramVar bv : superfluousOutVars) {
+			outVars.remove(bv);
+		}
 	}
 
 	/**
@@ -311,7 +353,7 @@ public class TransFormulaBuilder {
 			tfb.addInVar(bv, freshTv);
 			tfb.addOutVar(bv, freshTv);
 		}
-		tfb.setFormula(new Substitution(script.getScript(), substitutionMapping).transform(term));
+		tfb.setFormula(Substitution.apply(script, substitutionMapping, term));
 		tfb.setInfeasibility(SmtUtils.isFalseLiteral(term) ? Infeasibility.INFEASIBLE : Infeasibility.NOT_DETERMINED);
 		return tfb.finishConstruction(script);
 	}
@@ -347,7 +389,7 @@ public class TransFormulaBuilder {
 				throw new UnsupportedOperationException("constants not yet supported");
 			}
 
-			final TermVarsProc tvp = TermVarsProc.computeTermVarsProc(rhs.get(i), mgdScript.getScript(), symbolTable);
+			final TermVarsProc tvp = TermVarsProc.computeTermVarsProc(rhs.get(i), mgdScript, symbolTable);
 			rhsPvs.addAll(tvp.getVars());
 		}
 
@@ -363,7 +405,6 @@ public class TransFormulaBuilder {
 		}
 
 		final List<Term> conjuncts = new ArrayList<>();
-		final Substitution subst = new Substitution(mgdScript.getScript(), substitutionMapping);
 		for (int i = 0; i < lhs.size(); i++) {
 			final IProgramVar pv = lhs.get(i);
 			final TermVariable freshTv =
@@ -373,8 +414,8 @@ public class TransFormulaBuilder {
 			if (lhsAreAlsoInVars) {
 				tfb.addInVar(pv, freshTv);
 			}
-			final Term renamedRightHandSide = subst.transform(rhs.get(i));
-			conjuncts.add(mgdScript.getScript().term("=", freshTv, renamedRightHandSide));
+			final Term renamedRightHandSide = Substitution.apply(mgdScript, substitutionMapping, rhs.get(i));
+			conjuncts.add(SmtUtils.binaryEquality(mgdScript.getScript(), freshTv, renamedRightHandSide));
 		}
 
 		final Term conjunction = SmtUtils.and(mgdScript.getScript(), conjuncts);
@@ -409,7 +450,7 @@ public class TransFormulaBuilder {
 				tfb.addOutVar(r, rFreshTv);
 			}
 			tfb.addOutVar(l, lFreshTv);
-			conjuncts.add(mgdScript.getScript().term("=", lFreshTv, rFreshTv));
+			conjuncts.add(SmtUtils.binaryEquality(mgdScript.getScript(), lFreshTv, rFreshTv));
 		}
 
 		final Term conjunction = SmtUtils.and(mgdScript.getScript(), conjuncts);
@@ -447,7 +488,7 @@ public class TransFormulaBuilder {
 		if (tf instanceof UnmodifiableTransFormula) {
 			branchEncoders = ((UnmodifiableTransFormula) tf).getBranchEncoders();
 		} else {
-			branchEncoders = Collections.emptySet();
+			branchEncoders = ImmutableSet.empty();
 		}
 		final TransFormulaBuilder tfb = new TransFormulaBuilder(tf.getInVars(), tf.getOutVars(),
 				tf.getNonTheoryConsts().isEmpty(), tf.getNonTheoryConsts().isEmpty() ? null : tf.getNonTheoryConsts(),
@@ -508,7 +549,7 @@ public class TransFormulaBuilder {
 		if (tf instanceof UnmodifiableTransFormula) {
 			branchEncoders = ((UnmodifiableTransFormula) tf).getBranchEncoders();
 		} else {
-			branchEncoders = Collections.emptySet();
+			branchEncoders = ImmutableSet.empty();
 		}
 		final Set<TermVariable> auxVars = new HashSet<>(tf.getAuxVars());
 		final Map<Term, Term> substitutionMapping = new HashMap<>();
@@ -547,7 +588,7 @@ public class TransFormulaBuilder {
 		} else {
 			infeasibility = Infeasibility.NOT_DETERMINED;
 		}
-		final Term newFormula = new Substitution(script, substitutionMapping).transform(tf.getFormula());
+		final Term newFormula = Substitution.apply(script, substitutionMapping, tf.getFormula());
 		final TransFormulaBuilder tfb = new TransFormulaBuilder(newInVars, newOutVars,
 				tf.getNonTheoryConsts().isEmpty(), tf.getNonTheoryConsts().isEmpty() ? null : tf.getNonTheoryConsts(),
 				branchEncoders.isEmpty(), branchEncoders.isEmpty() ? null : branchEncoders, false);
@@ -557,5 +598,97 @@ public class TransFormulaBuilder {
 			tfb.addAuxVarsButRenameToFreshCopies(auxVars, script);
 		}
 		return tfb.finishConstruction(script);
+	}
+
+	/**
+	 *
+	 * Construct a copy of a given {@link Transformula} where all parts are replaced by new ones that are known to a new
+	 * solver, i.e., rebuild using the provided {@link TermTransferrer} instance.
+	 *
+	 * Note that if you want to transfer multiple transformulas to the same new solver instance, you have to share the
+	 * cache instance between the transfer calls. Also, <code>script</code> must be the script that {@link Term}s are
+	 * transferred to, i.e., the new script.
+	 */
+	public static TransferResult transferTransformula(final TermTransferrer tt, final ManagedScript script,
+			final Map<IProgramVarOrConst, IProgramVarOrConst> cache, final TransFormula tf) {
+
+		final Function<TermVariable, TermVariable> transferTv = a -> (TermVariable) tt.transform(a);
+		final Function<IProgramVar, IProgramVar> getOrTransferProgramVar = oldPv -> {
+			IProgramVarOrConst newPv = cache.get(oldPv);
+			if (newPv == null) {
+				newPv = ProgramVarUtils.transferProgramVar(tt, oldPv);
+				cache.put(oldPv, newPv);
+			}
+			return (IProgramVar) newPv;
+		};
+
+		final Function<IProgramConst, IProgramConst> getOrTransferProgramConst = oldPc -> {
+			IProgramVarOrConst newPc = cache.get(oldPc);
+			if (newPc == null) {
+				newPc = ProgramVarUtils.transferProgramConst(tt, oldPc);
+				cache.put(oldPc, newPc);
+			}
+			return (IProgramConst) newPc;
+		};
+
+		final Set<TermVariable> branchEncoders;
+		if (tf instanceof UnmodifiableTransFormula) {
+			final Set<TermVariable> oldBranchEncoders = ((UnmodifiableTransFormula) tf).getBranchEncoders();
+			branchEncoders = oldBranchEncoders.stream().map(transferTv).collect(Collectors.toSet());
+		} else {
+			branchEncoders = ImmutableSet.empty();
+		}
+		final Set<TermVariable> auxVars = tf.getAuxVars().stream().map(transferTv).collect(Collectors.toSet());
+
+		final Map<IProgramVar, TermVariable> newInVars = new HashMap<>();
+		for (final Entry<IProgramVar, TermVariable> entry : tf.getInVars().entrySet()) {
+			final IProgramVar newPv = getOrTransferProgramVar.apply(entry.getKey());
+			final TermVariable newTv = transferTv.apply(entry.getValue());
+			newInVars.put(newPv, newTv);
+		}
+		final Map<IProgramVar, TermVariable> newOutVars = new HashMap<>();
+		for (final Entry<IProgramVar, TermVariable> entry : tf.getOutVars().entrySet()) {
+			final IProgramVar newPv = getOrTransferProgramVar.apply(entry.getKey());
+			final TermVariable newTv = transferTv.apply(entry.getValue());
+			newOutVars.put(newPv, newTv);
+		}
+
+		final Infeasibility infeasibility;
+		if (tf instanceof UnmodifiableTransFormula) {
+			infeasibility = ((UnmodifiableTransFormula) tf).isInfeasible();
+		} else {
+			infeasibility = Infeasibility.NOT_DETERMINED;
+		}
+		final Term newFormula = tt.transform(tf.getFormula());
+		final Set<IProgramConst> nonTheoryConsts =
+				tf.getNonTheoryConsts().stream().map(getOrTransferProgramConst).collect(Collectors.toSet());
+
+		final TransFormulaBuilder tfb = new TransFormulaBuilder(newInVars, newOutVars, nonTheoryConsts.isEmpty(),
+				nonTheoryConsts.isEmpty() ? null : nonTheoryConsts, branchEncoders.isEmpty(),
+				branchEncoders.isEmpty() ? null : branchEncoders, false);
+		tfb.setFormula(newFormula);
+		tfb.setInfeasibility(infeasibility);
+		if (!auxVars.isEmpty()) {
+			tfb.addAuxVarsButRenameToFreshCopies(auxVars, script);
+		}
+
+		return new TransferResult(cache, tfb.finishConstruction(script));
+	}
+
+	public static final class TransferResult
+			extends BaseTuple<Map<IProgramVarOrConst, IProgramVarOrConst>, UnmodifiableTransFormula> {
+
+		public TransferResult(final Map<IProgramVarOrConst, IProgramVarOrConst> cache,
+				final UnmodifiableTransFormula tf) {
+			super(cache, tf);
+		}
+
+		public UnmodifiableTransFormula getTransformula() {
+			return mSecondElement;
+		}
+
+		public Map<IProgramVarOrConst, IProgramVarOrConst> getTransferedProgramVarOrConsts() {
+			return mFirstElement;
+		}
 	}
 }

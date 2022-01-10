@@ -36,6 +36,7 @@ import de.uni_freiburg.informatik.ultimate.logic.ApplicationTerm;
 import de.uni_freiburg.informatik.ultimate.logic.ConstantTerm;
 import de.uni_freiburg.informatik.ultimate.logic.FormulaUnLet;
 import de.uni_freiburg.informatik.ultimate.logic.FunctionSymbol;
+import de.uni_freiburg.informatik.ultimate.logic.MatchTerm;
 import de.uni_freiburg.informatik.ultimate.logic.NonRecursive;
 import de.uni_freiburg.informatik.ultimate.logic.QuantifiedFormula;
 import de.uni_freiburg.informatik.ultimate.logic.Rational;
@@ -453,8 +454,9 @@ public class ProofChecker extends NonRecursive {
 	 */
 	private int mNumInstancesUsed;
 	private int mNumInstancesFromDER;
-	private int mNumInstancesFromCheckpoint;
-	private int mNumInstancesFromFinalcheck;
+	private int mNumInstancesFromConflictUnitSearch;
+	private int mNumInstancesFromEMatching;
+	private int mNumInstancesFromEnumeration;
 
 	/**
 	 * Create a proof checker.
@@ -504,8 +506,10 @@ public class ProofChecker extends NonRecursive {
 
 		// TODO Handle this in a better way (e.g. as part of statistics)
 		if (proof.getTheory().getLogic().isQuantified()) {
-			mLogger.warn("Proof: Instances of quantified clauses used: %d (DER: %d Checkpoint: %d Final check: %d)",
-					mNumInstancesUsed, mNumInstancesFromDER, mNumInstancesFromCheckpoint, mNumInstancesFromFinalcheck);
+			mLogger.warn(
+					"Proof: Instances of quantified clauses used: %d (DER: %d Conflict/unit search: %d E-matching: %d Enumeration: %d)",
+					mNumInstancesUsed, mNumInstancesFromDER, mNumInstancesFromConflictUnitSearch,
+					mNumInstancesFromEMatching, mNumInstancesFromEnumeration);
 		}
 		return mError == 0;
 	}
@@ -642,6 +646,11 @@ public class ProofChecker extends NonRecursive {
 		} else if (lemmaType == ":CC" || lemmaType == ":read-over-weakeq" || lemmaType == ":weakeq-ext"
 				|| lemmaType == ":read-const-weakeq" || lemmaType == ":const-weakeq") {
 			checkArrayLemma(lemmaType, clause, (Object[]) lemmaAnnotation);
+		} else if (lemmaType == ":dt-project" || lemmaType == ":dt-tester" || lemmaType == ":dt-constructor"
+				|| lemmaType == ":dt-cases" || lemmaType == ":dt-unique" || lemmaType == ":dt-injective"
+				|| lemmaType == ":dt-disjoint" || lemmaType == ":dt-cycle") {
+			reportWarning("Unchecked datatype lemma " + annTerm);
+			checkDataTypeLemma(lemmaType, clause, (Object[]) lemmaAnnotation);
 		} else if (lemmaType == ":trichotomy") {
 			checkTrichotomy(clause);
 		} else if (lemmaType == ":EQ") {
@@ -651,10 +660,13 @@ public class ProofChecker extends NonRecursive {
 			final Object[] subannots = ((Object[]) lemmaAnnotation);
 			assert subannots.length == 5;
 			final String solverPart = (String) subannots[2];
-			if (solverPart == ":Checkpoint") {
-				mNumInstancesFromCheckpoint++;
-			} else if (solverPart == ":Finalcheck") {
-				mNumInstancesFromFinalcheck++;
+			if (solverPart == ":conflict") {
+				mNumInstancesFromConflictUnitSearch++;
+			} else if (solverPart == ":e-matching") {
+				mNumInstancesFromEMatching++;
+			} else {
+				assert solverPart == ":enumeration";
+				mNumInstancesFromEnumeration++;
 			}
 			checkInstLemma(clause, subannots);
 		} else {
@@ -1116,15 +1128,27 @@ public class ProofChecker extends NonRecursive {
 	}
 
 	/**
-	 * Check whether the disequality between two terms is trivial. There are two cases, (1) the difference between the
-	 * terms is constant and nonzero, e.g. {@code (= x (+ x 1))}, or (2) the difference contains only integer variables
+	 * Check a data type lemma for correctness. If a problem is found, an error is
+	 * reported.
+	 *
+	 * @param type         the lemma type
+	 * @param clause       the clause to check
+	 * @param ccAnnotation the argument of the :CC annotation.
+	 */
+	private void checkDataTypeLemma(final String type, final Term[] clause, final Object[] ccAnnotation) {
+		// FIXME: add checks
+		return;
+	}
+
+	/**
+	 * Check whether the disequality between two terms is trivial. There are two
+	 * cases, (1) the difference between the terms is constant and nonzero, e.g.
+	 * {@code (= x (+ x 1))}, or (2) the difference contains only integer variables
 	 * and the constant divided by the gcd of the factors is non-integral, e.g.,
 	 * {@code (= (+ x (* 2 y)) (+ x (* 2 z) 1))}.
 	 *
-	 * @param first
-	 *            the left-hand side of the equality
-	 * @param second
-	 *            the right-hand side of the equality
+	 * @param first  the left-hand side of the equality
+	 * @param second the right-hand side of the equality
 	 * @return true if the equality is trivially not satisfied.
 	 */
 	boolean checkTrivialDisequality(final Term first, final Term second) {
@@ -1400,8 +1424,8 @@ public class ProofChecker extends NonRecursive {
 
 		// Check that the annotation of the lemma is well-formed.
 		if (quantAnnotation.length != 5 || quantAnnotation[0] != ":subs" || !(quantAnnotation[1] instanceof Term[])
-				|| (quantAnnotation[2] != ":DER" && quantAnnotation[2] != ":Checkpoint"
-						&& quantAnnotation[2] != ":Finalcheck")
+				|| (quantAnnotation[2] != ":conflict" && quantAnnotation[2] != ":e-matching"
+						&& quantAnnotation[2] != ":enumeration")
 				|| quantAnnotation[3] != ":subproof" || !(quantAnnotation[4] instanceof ApplicationTerm)) {
 			reportError("Malformed QuantAnnotation.");
 			return;
@@ -1478,6 +1502,11 @@ public class ProofChecker extends NonRecursive {
 			break;
 		case ":diff":
 			result = checkTautDiff(clause);
+			break;
+		case ":matchCase":
+		case ":matchDefault":
+			result = true;
+			reportWarning("Unchecked datatype tautology rule " + tautologyApp);
 			break;
 		default:
 			result = false;
@@ -3110,7 +3139,7 @@ public class ProofChecker extends NonRecursive {
 	}
 
 	boolean checkRewriteIntern(final Term lhs, Term rhs) {
-		if (!(lhs instanceof ApplicationTerm) && !(lhs instanceof TermVariable) || lhs.getSort().getName() != "Bool") {
+		if (lhs.getSort().getName() != "Bool") {
 			return false;
 		}
 
@@ -3130,8 +3159,19 @@ public class ProofChecker extends NonRecursive {
 			return false;
 		}
 
+		/* Check for auxiliary literals */
+		if (isApplication("ite", lhs) || isApplication("or", lhs) || isApplication("xor", lhs)
+				|| lhs instanceof MatchTerm) {
+			rhs = unquote(rhs, true);
+			return lhs == rhs;
+		}
+
+		if (!(lhs instanceof ApplicationTerm)) {
+			return false;
+		}
 		final ApplicationTerm at = (ApplicationTerm) lhs;
-		if (!at.getFunction().isInterpreted() || at.getFunction().getName() == "select") {
+		if (!at.getFunction().isInterpreted() || at.getFunction().getName() == "select"
+				|| at.getFunction().getName() == "is") {
 			/* boolean literals are not quoted */
 			if (at.getParameters().length == 0) {
 				return rhs == at;
@@ -3240,12 +3280,6 @@ public class ProofChecker extends NonRecursive {
 			}
 			rhsAffine.negate();
 			return lhsAffine.equals(rhsAffine);
-		}
-
-		/* Check for auxiliary literals */
-		if (isApplication("ite", lhs) || isApplication("or", lhs) || isApplication("xor", lhs)) {
-			rhs = unquote(rhs, true);
-			return lhs == rhs;
 		}
 		return false;
 	}
@@ -3527,8 +3561,11 @@ public class ProofChecker extends NonRecursive {
 			break;
 		case ":subst":
 			result = checkSplitSubst((Term[]) splitAnnot.getValue(), origTerm, splitTerm);
-			mNumInstancesUsed++;
-			mNumInstancesFromDER++;
+			if (splitTerm.getFreeVars().length == 0) {
+				// Partial instantiated clauses count when they become ground instances in an inst-lemma.
+				mNumInstancesUsed++;
+				mNumInstancesFromDER++;
+			}
 			break;
 		default:
 			result = false;

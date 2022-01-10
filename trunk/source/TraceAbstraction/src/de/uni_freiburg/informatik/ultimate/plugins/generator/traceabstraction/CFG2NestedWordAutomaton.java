@@ -65,6 +65,7 @@ import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.ManagedScript;
 import de.uni_freiburg.informatik.ultimate.logic.Term;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.rcfgbuilder.cfg.Summary;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.ImmutableSet;
 
 public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 	private static final boolean DEBUG_STORE_HISTORY = false;
@@ -287,20 +288,12 @@ public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 				final List<IPredicate> notinUseStates = new ArrayList<>();
 				final List<IPredicate> inUseStates = new ArrayList<>();
 				for (final ThreadInstance ti : threadInstances) {
-					IPredicate threadNotInUsePredicate;
-					{
-						final String threadNotInUseString = ti.getThreadInstanceName() + "NotInUse";
-						threadNotInUsePredicate = predicateFactory.newDebugPredicate(threadNotInUseString);
-					}
-					IPredicate threadInUsePredicate;
-					{
-						final String threadInUseString = ti.getThreadInstanceName() + "InUse";
-						threadInUsePredicate = predicateFactory.newDebugPredicate(threadInUseString);
-					}
-					threadInstance2notinUseState.put(ti.getThreadInstanceName(), threadNotInUsePredicate);
-					threadInstance2inUseState.put(ti.getThreadInstanceName(), threadInUsePredicate);
-					net.addPlace(threadNotInUsePredicate, true, false);
-					net.addPlace(threadInUsePredicate, false, false);
+					final String threadInstanceId = ti.getThreadInstanceName();
+					final IPredicate threadNotInUsePredicate = threadInstance2notinUseState.computeIfAbsent(
+							threadInstanceId, x -> createThreadNotInUsePredicate(x, net, predicateFactory));
+					final IPredicate threadInUsePredicate = threadInstance2inUseState.computeIfAbsent(threadInstanceId,
+							x -> createThreadInUsePredicate(x, net, predicateFactory));
+
 					notinUseStates.add(threadNotInUsePredicate);
 					inUseStates.add(threadInUsePredicate);
 				}
@@ -329,10 +322,11 @@ public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 							final Set<IPredicate> successors = new HashSet<>(threadInUse);
 							predecessors.add(state);
 							successors.add(succState);
-							net.addTransition((LETTER) edge, predecessors, successors);
+							net.addTransition((LETTER) edge, ImmutableSet.of(predecessors),
+									ImmutableSet.of(successors));
 						} else {
-							net.addTransition((LETTER) edge, Collections.singleton(state),
-									Collections.singleton(succState));
+							net.addTransition((LETTER) edge, ImmutableSet.singleton(state),
+									ImmutableSet.singleton(succState));
 						}
 					} else if (edge instanceof IIcfgForkTransitionThreadCurrent) {
 						// add nothing, in the Petri net we only use the IIcfgForkTransitionOtherThread
@@ -358,7 +352,7 @@ public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 							predecessors = Collections.singleton(state);
 							successors = new HashSet<>(Arrays.asList(succCurrentThread, succState));
 						}
-						net.addTransition((LETTER) edge, predecessors, successors);
+						net.addTransition((LETTER) edge, ImmutableSet.of(predecessors), ImmutableSet.of(successors));
 					} else if (edge instanceof IIcfgJoinTransitionThreadCurrent) {
 						// add nothing, in the Petri net we only use the IIcfgJoinTransitionOtherThread
 					} else if (edge instanceof IIcfgJoinTransitionThreadOther) {
@@ -381,7 +375,8 @@ public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 								predecessors = new HashSet<>(Arrays.asList(predCurrentThread, state));
 								successors = Collections.singleton(succState);
 							}
-							net.addTransition((LETTER) edge, predecessors, successors);
+							net.addTransition((LETTER) edge, ImmutableSet.of(predecessors),
+									ImmutableSet.of(successors));
 						}
 					} else if (edge instanceof IIcfgCallTransition<?>) {
 						throw new UnsupportedOperationException(
@@ -400,6 +395,22 @@ public class CFG2NestedWordAutomaton<LETTER extends IIcfgTransition<?>> {
 			}
 		}
 		return net;
+	}
+
+	private static <LETTER> IPredicate createThreadNotInUsePredicate(final String threadInstanceId,
+			final BoundedPetriNet<LETTER, IPredicate> net, final PredicateFactory predicateFactory) {
+		final String threadNotInUseString = threadInstanceId + "NotInUse";
+		final IPredicate threadNotInUsePredicate = predicateFactory.newDebugPredicate(threadNotInUseString);
+		net.addPlace(threadNotInUsePredicate, true, false);
+		return threadNotInUsePredicate;
+	}
+
+	private static <LETTER> IPredicate createThreadInUsePredicate(final String threadInstanceId,
+			final BoundedPetriNet<LETTER, IPredicate> net, final PredicateFactory predicateFactory) {
+		final String threadInUseString = threadInstanceId + "InUse";
+		final IPredicate threadInUsePredicate = predicateFactory.newDebugPredicate(threadInUseString);
+		net.addPlace(threadInUsePredicate, false, false);
+		return threadInUsePredicate;
 	}
 
 	private static int getThreadInstanceNumber(final IIcfgForkTransitionThreadCurrent<?> current,

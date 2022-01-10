@@ -32,12 +32,10 @@ import de.uni_freiburg.informatik.ultimate.automata.statefactory.IEmptyStackStat
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
 import de.uni_freiburg.informatik.ultimate.lib.mcr.IInterpolantProvider;
-import de.uni_freiburg.informatik.ultimate.lib.mcr.IpInterpolantProvider;
 import de.uni_freiburg.informatik.ultimate.lib.mcr.SpInterpolantProvider;
 import de.uni_freiburg.informatik.ultimate.lib.mcr.WpInterpolantProvider;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.CfgSmtToolkit;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.structure.IIcfgTransition;
-import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.hoaretriple.IncrementalHoareTripleChecker;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.IPredicate;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.IPredicateUnifier;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.smt.predicates.PredicateFactory;
@@ -50,7 +48,6 @@ import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtUtils.XnfConversio
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.TermClassifier;
 import de.uni_freiburg.informatik.ultimate.lib.tracecheckerutils.singletracecheck.InterpolationTechnique;
 import de.uni_freiburg.informatik.ultimate.lib.tracecheckerutils.singletracecheck.TraceCheckUtils;
-import de.uni_freiburg.informatik.ultimate.logic.Logics;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.PathProgramCache;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.PredicateFactoryForInterpolantAutomata;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.preferences.TAPreferences;
@@ -113,32 +110,47 @@ public class StrategyModuleFactory<L extends IIcfgTransition<?>> {
 		if (useInterpolantConsolidation) {
 			throw new UnsupportedOperationException("Interpolant consolidation and MCR cannot be combined");
 		}
-		return new StrategyModuleMcr<>(mLogger, mPrefs, mPredicateUnifier, mEmptyStackFactory, strategyFactory,
-				mCounterexample, mAbstraction, mTaskIdentifier, createMcrInterpolantProvider());
+		return new StrategyModuleMcr<>(mServices, mLogger, mPrefs, mPredicateUnifier, mEmptyStackFactory,
+				strategyFactory, mCounterexample, mAbstraction, mTaskIdentifier, createMcrInterpolantProvider());
 	}
 
-	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolCraig(final boolean useTimeout,
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolCraig(final InterpolationTechnique technique,
+			final AssertCodeBlockOrder... order) {
+		return createIpTcStrategyModuleSmtInterpolCraig(-1, technique, order);
+	}
+
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolCraig(final long timeoutInMillis,
 			final InterpolationTechnique technique, final AssertCodeBlockOrder... order) {
 		return createModuleWrapperIfNecessary(new IpTcStrategyModuleSmtInterpolCraig<>(mTaskIdentifier, mServices,
 				mPrefs, mCounterexample, mPrecondition, mPostcondition,
 				new AssertionOrderModulation<>(mPathProgramCache, mLogger, order), mPredicateUnifier, mPredicateFactory,
-				useTimeout, technique));
+				timeoutInMillis, technique));
 	}
 
-	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolSpWp(final boolean useTimeout,
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolSpWp(final InterpolationTechnique technique,
+			final AssertCodeBlockOrder... order) {
+		return createIpTcStrategyModuleSmtInterpolSpWp(-1, technique, order);
+	}
+
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleSmtInterpolSpWp(final long timeoutInMillis,
 			final InterpolationTechnique technique, final AssertCodeBlockOrder... order) {
 		return createModuleWrapperIfNecessary(new IpTcStrategyModuleSmtInterpolSpWp<>(mTaskIdentifier, mServices,
 				mPrefs, mCounterexample, mPrecondition, mPostcondition,
 				new AssertionOrderModulation<>(mPathProgramCache, mLogger, order), mPredicateUnifier, mPredicateFactory,
-				useTimeout, technique));
+				timeoutInMillis, technique));
 	}
 
-	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleZ3(final boolean useTimeout,
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleZ3(final InterpolationTechnique technique,
+			final AssertCodeBlockOrder... order) {
+		return createIpTcStrategyModuleZ3(-1, technique, order);
+	}
+
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleZ3(final long timeoutInMillis,
 			final InterpolationTechnique technique, final AssertCodeBlockOrder... order) {
 		return createModuleWrapperIfNecessary(
 				new IpTcStrategyModuleZ3<>(mTaskIdentifier, mServices, mPrefs, mCounterexample, mPrecondition,
 						mPostcondition, new AssertionOrderModulation<>(mPathProgramCache, mLogger, order),
-						mPredicateUnifier, mPredicateFactory, useTimeout, technique));
+						mPredicateUnifier, mPredicateFactory, timeoutInMillis, technique));
 	}
 
 	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleMathsat(final InterpolationTechnique technique,
@@ -149,12 +161,17 @@ public class StrategyModuleFactory<L extends IIcfgTransition<?>> {
 						mPredicateUnifier, mPredicateFactory, technique));
 	}
 
-	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleCVC4(final boolean useTimeout,
-			final InterpolationTechnique technique, final Logics logic, final AssertCodeBlockOrder... order) {
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleCVC4(final InterpolationTechnique technique,
+			final AssertCodeBlockOrder... order) {
+		return createIpTcStrategyModuleCVC4(-1, technique, order);
+	}
+
+	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleCVC4(final long timeoutInMillis,
+			final InterpolationTechnique technique, final AssertCodeBlockOrder... order) {
 		return createModuleWrapperIfNecessary(
 				new IpTcStrategyModuleCvc4<>(mTaskIdentifier, mServices, mPrefs, mCounterexample, mPrecondition,
 						mPostcondition, new AssertionOrderModulation<>(mPathProgramCache, mLogger, order),
-						mPredicateUnifier, mPredicateFactory, useTimeout, technique, logic));
+						mPredicateUnifier, mPredicateFactory, timeoutInMillis, technique));
 	}
 
 	public IIpTcStrategyModule<?, L> createIpTcStrategyModuleAbstractInterpretation() {
@@ -170,8 +187,8 @@ public class StrategyModuleFactory<L extends IIcfgTransition<?>> {
 	}
 
 	public IIpTcStrategyModule<?, L> createIpTcStrategyModulePdr() {
-		return createModuleWrapperIfNecessary(new IpTcStrategyModulePdr<>(mLogger, mPrecondition, mPostcondition,
-				mCounterexample, mPredicateUnifier, mPrefs, mTransitionClazz));
+		return createModuleWrapperIfNecessary(new IpTcStrategyModulePdr<>(mServices, mLogger, mPrecondition,
+				mPostcondition, mCounterexample, mPredicateUnifier, mPrefs, mTransitionClazz));
 	}
 
 	public IIpTcStrategyModule<?, L> createIpTcStrategyModulePreferences() {
@@ -205,7 +222,7 @@ public class StrategyModuleFactory<L extends IIcfgTransition<?>> {
 				mTaPrefs.overrideInterpolantAutomaton() ? mTaPrefs.interpolantAutomaton() : setting;
 		switch (realSetting) {
 		case STRAIGHT_LINE:
-			return new IpAbStrategyModuleStraightlineAll<>(mServices, mAbstraction, mCounterexample,
+			return new IpAbStrategyModuleStraightlineAll<>(mServices, mLogger, mAbstraction, mCounterexample,
 					mEmptyStackFactory);
 		case CANONICAL:
 			return new IpAbStrategyModuleCanonical<>(mServices, mLogger, mAbstraction, mCounterexample,
@@ -232,15 +249,15 @@ public class StrategyModuleFactory<L extends IIcfgTransition<?>> {
 		final SimplificationTechnique simplificationTechnique = mPrefs.getSimplificationTechnique();
 		final XnfConversionTechnique xnfConversionTechnique = mPrefs.getXnfConversionTechnique();
 		switch (mTaPrefs.getMcrInterpolantMethod()) {
-		case INTERPOLATION:
-			return new IpInterpolantProvider<>(mPrefs.getUltimateServices(), mLogger, managedScript, mPredicateUnifier,
-					simplificationTechnique, xnfConversionTechnique);
+		// case INTERPOLATION:
+		// return new IpInterpolantProvider<>(mPrefs.getUltimateServices(), mLogger, managedScript, mPredicateUnifier,
+		// simplificationTechnique, xnfConversionTechnique);
 		case WP:
 			return new WpInterpolantProvider<>(mServices, mLogger, managedScript, simplificationTechnique,
-					xnfConversionTechnique, mPredicateUnifier, new IncrementalHoareTripleChecker(mCsToolkit, false));
+					xnfConversionTechnique, mPredicateUnifier);
 		case SP:
 			return new SpInterpolantProvider<>(mServices, mLogger, managedScript, simplificationTechnique,
-					xnfConversionTechnique, mPredicateUnifier, new IncrementalHoareTripleChecker(mCsToolkit, false));
+					xnfConversionTechnique, mPredicateUnifier);
 		default:
 			throw new IllegalArgumentException("Setting " + mTaPrefs.getMcrInterpolantMethod() + " is unsupported");
 		}

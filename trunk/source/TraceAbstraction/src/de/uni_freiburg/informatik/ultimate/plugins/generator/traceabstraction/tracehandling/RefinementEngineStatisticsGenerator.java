@@ -71,7 +71,7 @@ public class RefinementEngineStatisticsGenerator implements IStatisticsDataProvi
 	 * Signal that the refinement engine has finished executing and all collected statistics should be aggregated now.
 	 */
 	public void finishRefinementEngineRun() {
-		for (final Entry<RefinementEngineStatisticsDefinitions, Set<IStatisticsDataProvider>> entry : mStats.getMap()
+		for (final Entry<RefinementEngineStatisticsDefinitions, Set<IStatisticsDataProvider>> entry : mStats
 				.entrySet()) {
 			final StatisticsData aggregatedData = mStatsAggregated.getOrConstruct(entry.getKey());
 			for (final IStatisticsDataProvider data : entry.getValue()) {
@@ -146,11 +146,6 @@ public class RefinementEngineStatisticsGenerator implements IStatisticsDataProvi
 		@Override
 		public String prettyprint(final Object o) {
 			return mPrettyprinter.apply(name()).apply(o);
-		}
-
-		@Override
-		public Class<?> getDataType() {
-			return mClazz;
 		}
 	}
 }

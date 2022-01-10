@@ -1,21 +1,18 @@
-This WebBackend project is for serving the Ultimate tools as a web-service.
-The WebBackend application runs an embedded jetty to provide an API for executing Ultimate jobs.
+# WebBackend
+The `WebBackend` project is for serving Ultimate tools as a web-service.
+`WebBackend` runs an embedded jetty to provide an API for executing Ultimate jobs.
 
-# Deploy
-Goto `trunk/source/BA_MavenParentUltimate` run `mvn clean install -P materialize`.
-After a successful build, goto `trunk/source/BA_WebBackend`. The artifacts to run and configure the application are in `./target/products`, as well as a copy of this README.md.
+## Deploy
+ * `cd trunk/source/BA_MavenParentUltimate` 
+ * Run `mvn clean install -P materialize`
+ * After a successful build, `cd trunk/source/BA_WebBackend` 
+ * The artifacts to run and configure the application are in `./target/products`, as well as a copy of this `README.md`.
 
-There are two main artifacts. The WebBackend (described by this README) and the front-end (in the folder WebsiteStatic).
-* **WebsiteStatic** is a standalone frontend supposed to be served by a webserver (e.g. Apache or Nginx). It is plain copy of the `trunk/source/WebsiteStatic` folder. See [trunk/source/WebsiteStatic/README.md](../WebsiteStatic/README.md) for documantation.
-* **WebBackend** contains the Backend (this project). It runs the ultimate framework and listens to incoming API calls from the frontend.
+There are two main artifacts. The `WebBackend` (described by this README) and the front-end (in the folder `WebsiteStatic`).
+* **WebsiteStatic** is a standalone frontend supposed to be served by a web server (e.g. Apache or Nginx). It is a plain copy of the `trunk/source/WebsiteStatic` folder. See [trunk/source/WebsiteStatic/README.md](../WebsiteStatic/README.md) for documentation.
+* **WebBackend** contains the Backend (this project). It runs the Ultimate framework as a backend and listens to incoming API calls from the frontend or someone else.
 
-# Running the Ultimate web-service together with the front-end
-
-## Requirements 
-TODO
-
-
-## Configuration
+## Running the Ultimate web-service together with the front-end
 
 ### Initial backend configuration
 TODO: Copy the backend from `./target/products/WebBackend/<plattform>/<ws>/<arch>/` to some folder, i.e. `/opt`. 
@@ -42,12 +39,12 @@ Mandatory:
  SETTINGS_WHITELIST=C:\\path\\to\\your\\settings_whitelist.json
 ```
 
-## Changing configuration
-There are 2 ways of changing configuration settings. By the `web.config.properties` file or via VM arguments.
+### Changing configuration
+There are two ways of changing configuration settings, either through the `web.config.properties` file or through VM arguments.
 
-A setting "`SETTING_FOO`" in `web.config.properties` can be overridden via VM argument `-DWebBackend.SETTING_FOO=bar`.
+A setting `SETTING_FOO` in `web.config.properties` can be overridden via VM argument `-DWebBackend.SETTING_FOO=bar`.
 
-## Default configuration
+### Default configuration
 
 	# DEBUG (bool) .............. : True increases the verbosity of the logs.
 	# PORT (int) ................ : determines the port the jetty server will be listening.
@@ -73,31 +70,29 @@ A setting "`SETTING_FOO`" in `web.config.properties` can be overridden via VM ar
     LOG_FILE_PATH=C:\\path\\to\\var\\log\\logfile.log
     LOG_LEVEL=INFO
 
-## Whitelist for user settings
-User settings can be allowed per plugin and key.
+### Whitelist for user settings
+Users of the API can change settings if these are white-listed. A whitelist entry describes a plugin ID and a settings label.
 
 Create or edit the existing a `settings_whitelist.json`:
-
 ```json
 {
-	"plugin.id": ["key_foo", "key_bar"],
+	"plugin.id": ["key1", "key2", ...],
 	"de.uni_freiburg.informatik.ultimate.plugins.analysis.syntaxchecker": [
 		"remove filename from checker output"
 	],
 }
 ```
+Ensure the path to `settings_whitelist.json` is set correctly for the `SETTINGS_WHITELIST` setting.
 
-Ensure the path to ``settings_whitelist.json` is set correctly for the `SETTINGS_WHITELIST` setting.
-
-## Serving the front-end (aka WebsiteStatic)
+## Serving the front-end (aka `WebsiteStatic`)
 After a build, a cleaned, ready to be served Version of the `WebsiteStatic` project can be found in `trunk/source/BA_WebBackend/target/products/WebsiteStatic`.
 
 ### Bundled with the backend
 * Set the config-parameter `SERVE_WEBSITE` to `True`.
-* Set the config-parameter `FRONTEND_PATH` to the absolute path of the "WebsiteStatic" folder.
-* Configure the Website. See `trunk/source/WebsiteStatic/README.md` for details.
+* Set the config-parameter `FRONTEND_PATH` to the absolute path of the `WebsiteStatic` folder.
+* Configure the Website (see `trunk/source/WebsiteStatic/README.md` for details).
 
 ### Stand alone
 * Set the config-parameter `SERVE_WEBSITE` to `False`.
-* Serve the content of `WebsiteStatic` as a static Html site from a webserver of your choice. 
-* Configure the Website. See `trunk/source/WebsiteStatic/README.md` for details.
+* Serve the content of `WebsiteStatic` as a static Html site from a web server of your choice. 
+* Configure the Website (see `trunk/source/WebsiteStatic/README.md` for details).
