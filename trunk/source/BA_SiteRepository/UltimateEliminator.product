@@ -33,11 +33,13 @@
       </win>
    </launcher>
 
+
    <vm>
       <linux include="false">org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11</linux>
       <macos include="false">org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11</macos>
       <windows include="false">org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11</windows>
    </vm>
+
 
    <plugins>
       <plugin id="com.github.jhoenicke.javacup"/>
@@ -57,11 +59,12 @@
       <plugin id="de.uni_freiburg.informatik.ultimate.lib.util"/>
       <plugin id="de.uni_freiburg.informatik.ultimate.smtinterpol"/>
       <plugin id="de.uni_freiburg.informatik.ultimate.smtsolver.external"/>
-      <plugin id="javax.activation"/>
+      <plugin id="javax.activation" version="1.1.0.v201211130549"/>
       <plugin id="javax.xml"/>
       <plugin id="javax.xml.bind"/>
       <plugin id="javax.xml.stream"/>
       <plugin id="net.sf.javabdd"/>
+      <plugin id="org.apache.commons.io"/>
       <plugin id="org.apache.commons.lang"/>
       <plugin id="org.apache.log4j"/>
       <plugin id="org.apache.logging.log4j"/>
