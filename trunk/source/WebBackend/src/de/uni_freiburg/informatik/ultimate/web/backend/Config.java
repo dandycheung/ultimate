@@ -121,7 +121,7 @@ public class Config {
 	 * @return
 	 */
 	private static boolean loadBoolean(final String propertyName, final boolean defaultValue) {
-		return (boolean) loadObject(propertyName, defaultValue);
+		return Boolean.parseBoolean((String) loadObject(propertyName, defaultValue));
 	}
 
 	/**
@@ -133,6 +133,6 @@ public class Config {
 	 * @return
 	 */
 	private static int loadInteger(final String propertyName, final Integer defaultValue) {
-		return (int) loadObject(propertyName, defaultValue);
+		return Integer.parseInt((String) loadObject(propertyName, defaultValue));
 	}
 }
