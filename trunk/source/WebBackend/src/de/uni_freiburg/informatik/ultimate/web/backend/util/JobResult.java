@@ -13,48 +13,49 @@ import org.json.JSONObject;
 public class JobResult {
 	private final String mJobId;
 	private JSONObject mJsonResult = new JSONObject();
-	
-	public JobResult(String jobId) {
+
+	public JobResult(final String jobId) {
 		mJobId = jobId;
 		validateJobId();
 	}
 
 	private void validateJobId() {
-		String cleanedId = mJobId.replaceAll("\\W+", "");
+		final String cleanedId = mJobId.replaceAll("\\W+", "");
 		if (cleanedId != mJobId) {
 			throw new IllegalArgumentException();
 		}
 	}
-	
+
 	String getFilePath() {
-		String filepath = System.getProperty("java.io.tmpdir") + File.separator + "log" + File.separator;
-        filepath += mJobId + ".result.json";
-        return filepath;
+		StringBuilder filepath = new StringBuilder().append(System.getProperty("java.io.tmpdir")).append(File.separator)
+				.append("log").append(File.separator);
+		filepath.append(mJobId).append(".result.json");
+		return filepath.toString();
 	}
-	
+
 	public void store() throws IOException {
-		BufferedWriter writer = new BufferedWriter(new FileWriter(getFilePath()));
-        writer.write(mJsonResult.toString());
-        writer.close();
+		final BufferedWriter writer = new BufferedWriter(new FileWriter(getFilePath()));
+		writer.write(mJsonResult.toString());
+		writer.close();
 	}
-	
+
 	public void load() throws JSONException, IOException, IllegalArgumentException {
 		try {
-			byte[] encoded = Files.readAllBytes(Paths.get(getFilePath()));
-	        String resultString = new String(encoded);
-	        mJsonResult = new JSONObject(resultString);
-		} catch (IOException e) {
+			final byte[] encoded = Files.readAllBytes(Paths.get(getFilePath()));
+			final String resultString = new String(encoded);
+			mJsonResult = new JSONObject(resultString);
+		} catch (final IOException e) {
 			mJsonResult = new JSONObject();
 			mJsonResult.put("error", "Job not found.");
 			throw new IllegalArgumentException("Job id not found.");
 		}
 	}
-	
+
 	public JSONObject getJson() {
 		return mJsonResult;
 	}
 
-	public void setJson(JSONObject jsonObject) {
+	public void setJson(final JSONObject jsonObject) {
 		mJsonResult = jsonObject;
 	}
 }

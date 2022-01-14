@@ -36,116 +36,107 @@ import de.uni_freiburg.informatik.ultimate.web.backend.util.ServletLogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.WebBackendToolchainJob;
 
 public class UltimateAPIController implements IUltimatePlugin, IController<RunDefinition> {
-	
+
 	private final ServletLogger mLogger;
 	private static final long TIMEOUT = 15 * 1000;
 	private File mInputFile;
 	private File mToolchainFile;
 	private File mSettingsFile;
-	private Request mRequest;
-	private JSONObject mResult;
+	private final Request mRequest;
+	private final JSONObject mResult;
 	private ICore<RunDefinition> mCore;
-	public static final boolean DEBUG = !false;
+	public static final boolean DEBUG = true;
 
-	public UltimateAPIController(final Request request, JSONObject result) {
+	public UltimateAPIController(final Request request, final JSONObject result) {
 		mLogger = request.getLogger();
 		mRequest = request;
 		mResult = result;
 	}
-	
+
 	public void run() {
 		// TODO: Allow timeout to be set in the API request and use it.
 		try {
-			WebBackendToolchainJob job = new WebBackendToolchainJob(
-					"WebBackendToolchainJob for request " + mRequest.getRequestId(), 
-					mCore, this, mLogger, new File[] { mInputFile }, mResult, mRequest, mToolchainFile,
-					mRequest.getRequestId());
+			final WebBackendToolchainJob job = new WebBackendToolchainJob(
+					"WebBackendToolchainJob for request " + mRequest.getRequestId(), mCore, this, mLogger,
+					new File[] { mInputFile }, mResult, mToolchainFile, mRequest.getRequestId());
 			mResult.put("requestId", mRequest.getRequestId());
 			job.schedule();
 			mResult.put("status", "scheduled");
-			JobResult jobResult = new JobResult(mRequest.getRequestId());
+			final JobResult jobResult = new JobResult(mRequest.getRequestId());
 			jobResult.setJson(mResult);
 			jobResult.store();
 		} catch (final Throwable t) {
 			mLogger.log("Failed to run Ultimate.");
 			try {
 				mResult.put("error", "Failed to run ULTIMATE: " + t.getMessage());
-			} catch (JSONException e) {
+			} catch (final JSONException e) {
 				if (DEBUG) {
 					e.printStackTrace();
 				}
 			}
 		}
 	}
-	
 
 	/**
 	 * Add user frontend settings to the plugins in the toolchain.
+	 *
 	 * @param tcData
 	 * @return Updated UltimateServiceProvider
 	 */
-	private IUltimateServiceProvider addUserSettings(IToolchainData<RunDefinition> tcData) {
-		IUltimateServiceProvider services = tcData.getServices();
-		
-		/* 
-		// Debug: traverse the toolchain to log its content.
-		RunDefinition tcRD = tcData.getRootElement();
-		ToolchainListType tc = tcRD.getToolchain();
-		List<Object> tcPluginOrSubchain = tc.getPluginOrSubchain();
-		for (Object pluginOrSubchain : tcPluginOrSubchain) {
-			mLogger.log(pluginOrSubchain.toString());
-		}
-		*/
-		
-		
+	private IUltimateServiceProvider addUserSettings(final IToolchainData<RunDefinition> tcData) {
+		final IUltimateServiceProvider services = tcData.getServices();
+
+		/*
+		 * // Debug: traverse the toolchain to log its content. RunDefinition tcRD = tcData.getRootElement();
+		 * ToolchainListType tc = tcRD.getToolchain(); List<Object> tcPluginOrSubchain = tc.getPluginOrSubchain(); for
+		 * (Object pluginOrSubchain : tcPluginOrSubchain) { mLogger.log(pluginOrSubchain.toString()); }
+		 */
+
 		// Get the user settings from the request
 		try {
 			mLogger.log("Apply user settings to run configuration.");
 			final JSONObject jsonParameter = new JSONObject(mRequest.getSingleParameter("user_settings"));
 			final JSONArray userSettings = jsonParameter.getJSONArray("user_settings");
 
-			for (int i=0; i < userSettings.length(); i++) {
-			    final JSONObject userSetting = userSettings.getJSONObject(i);
-			    String pluginId = userSetting.getString("plugin_id");
-			    String key = userSetting.getString("key");
-			    
-			    // Check if the setting is in the white-list.
-				if (Config.USER_SETTINGS_WHITELIST.PluginKeyIsWhitelisted(pluginId, key) == false) {
-					mLogger.log("User setting for plugin=" + pluginId + " key=" + key + " is not in whitelist. Ignoring.");
+			for (int i = 0; i < userSettings.length(); i++) {
+				final JSONObject userSetting = userSettings.getJSONObject(i);
+				final String pluginId = userSetting.getString("plugin_id");
+				final String key = userSetting.getString("key");
+
+				// Check if the setting is in the white-list.
+				if (!Config.USER_SETTINGS_WHITELIST.isPluginKeyWhitelisted(pluginId, key)) {
+					mLogger.log(
+							"User setting for plugin=" + pluginId + " key=" + key + " is not in whitelist. Ignoring.");
 					continue;
 				}
-			    
+
 				// Apply the setting.
 				switch (userSetting.getString("type")) {
 				case "bool":
-					services.getPreferenceProvider(pluginId).put(
-							key, userSetting.getBoolean("value"));
+					services.getPreferenceProvider(pluginId).put(key, userSetting.getBoolean("value"));
 					break;
 				case "int":
-					services.getPreferenceProvider(pluginId).put(
-							key, userSetting.getInt("value"));
+					services.getPreferenceProvider(pluginId).put(key, userSetting.getInt("value"));
 					break;
 				case "string":
-					services.getPreferenceProvider(pluginId).put(
-							key, userSetting.getString("value"));
+					services.getPreferenceProvider(pluginId).put(key, userSetting.getString("value"));
 					break;
 				case "real":
-					services.getPreferenceProvider(pluginId).put(
-							key, userSetting.getLong("value"));
+					services.getPreferenceProvider(pluginId).put(key, userSetting.getLong("value"));
 					break;
 				default:
 					mLogger.log("User setting type " + userSetting.getString("type") + " is unknown. Ignoring");
 				}
 			}
-		} catch (JSONException e) {
+		} catch (final JSONException e) {
 			mLogger.log("Could not fetch user settings: " + e.getMessage());
 		}
-				
+
 		return services;
 	}
 
 	/******************* Ultimate Plugin Implementation *****************/
-	
+
 	@Override
 	public String getPluginName() {
 		return Activator.PLUGIN_NAME;
@@ -160,19 +151,19 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	public IPreferenceInitializer getPreferences() {
 		return null;
 	}
-	
+
 	/**************** End Ultimate Plugin Implementation *****************/
-	
+
 	/**************** IController Implementation *****************/
 
 	@Override
-	public int init(ICore<RunDefinition> core) {
+	public int init(final ICore<RunDefinition> core) {
 		if (core == null) {
 			return -1;
 		}
-		
+
 		mCore = core;
-		
+
 		// Prepare {input, toolchain, settings} as temporary files.
 		mLogger.log("Prepare input files for RequestId: " + mRequest.getRequestId());
 		try {
@@ -180,38 +171,37 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 			setInputFile(mRequest, timestamp);
 			setToolchainFile(mRequest, timestamp);
 			mLogger.log("Written temporary files to " + mInputFile.getParent() + " with timestamp " + timestamp);
-		} catch (IOException e) {
+		} catch (final IOException e) {
 			try {
 				mResult.put("error", "Internal server error: IO");
-			} catch (JSONException eJson) {
-				if(DEBUG) {					
+			} catch (final JSONException eJson) {
+				if (DEBUG) {
 					eJson.printStackTrace();
 				}
 			}
 			mLogger.log("Internal server error: " + e.getClass().getSimpleName());
 			mLogger.logDebug(e.toString());
 
-			if (DEBUG) {				
+			if (DEBUG) {
 				e.printStackTrace();
 			}
 			return -1;
 		}
-		
+
 		core.resetPreferences(false);
-		
+
 		return 0;
 	}
 
 	@Override
-	public ISource selectParser(Collection<ISource> parser) {
+	public ISource selectParser(final Collection<ISource> parser) {
 		return null;
 	}
 
 	@Override
-	public IToolchainData<RunDefinition> selectTools(List<ITool> tools) {
+	public IToolchainData<RunDefinition> selectTools(final List<ITool> tools) {
 		try {
-			final IToolchainData<RunDefinition> tc = mCore.createToolchainData(mToolchainFile.getAbsolutePath());
-			return tc;
+			return mCore.createToolchainData(mToolchainFile.getAbsolutePath());
 		} catch (FileNotFoundException | JAXBException | SAXException e) {
 			mLogger.error("Exception during tool selection: " + e.getClass().getSimpleName() + ": " + e.getMessage());
 			return null;
@@ -219,34 +209,37 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	}
 
 	@Override
-	public List<String> selectModel(List<String> modelNames) {
+	public List<String> selectModel(final List<String> modelNames) {
 		return null;
 	}
 
 	@Override
-	public IToolchainData<RunDefinition> prerun(IToolchainData<RunDefinition> tcData) {
+	public IToolchainData<RunDefinition> prerun(final IToolchainData<RunDefinition> tcData) {
 		return tcData.replaceServices(addUserSettings(tcData));
 	}
 
 	@Override
-	public void displayToolchainResults(IToolchainData<RunDefinition> toolchain, Map<String, List<IResult>> results) {
-		
+	public void displayToolchainResults(final IToolchainData<RunDefinition> toolchain,
+			final Map<String, List<IResult>> results) {
+
 	}
 
 	@Override
-	public void displayException(IToolchainData<RunDefinition> toolchain, String description, Throwable ex) {
-		
+	public void displayException(final IToolchainData<RunDefinition> toolchain, final String description,
+			final Throwable ex) {
+
 	}
-	
+
 	/**************** End IController Implementation *****************/
-	
+
 	/**
 	 * Set the temporary ultimate input file. As set by the web-frontend user in the editor.
+	 *
 	 * @param internalRequest
 	 * @param timestamp
 	 * @throws IOException
 	 */
-	private void setInputFile(Request internalRequest, String timestamp) throws IOException {
+	private void setInputFile(final Request internalRequest, final String timestamp) throws IOException {
 		final String code = internalRequest.getSingleParameter("code");
 		final String fileExtension = internalRequest.getSingleParameter("code_file_extension");
 		mInputFile = writeTemporaryFile(timestamp + "_input", code, fileExtension);
@@ -254,20 +247,25 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 
 	/**
 	 * Set temporary settings file as sent by the web-frontend.
+	 *
 	 * @param internalRequest
 	 * @param timestamp
 	 * @throws IOException
 	 */
-	private void setToolchainFile(Request internalRequest, String timestamp) throws IOException {
+	private void setToolchainFile(final Request internalRequest, final String timestamp) throws IOException {
 		final String ultimate_toolchain_xml = internalRequest.getSingleParameter("ultimate_toolchain_xml");
 		mToolchainFile = writeTemporaryFile(timestamp + "_toolchain", ultimate_toolchain_xml, ".xml");
 	}
 
 	/**
 	 * Creates a file in the default temporary-file.
-	 * @param name The name of the file (without file extension).
-	 * @param content Content to end up in the file.
-	 * @param fileExtension File extension to be used in the file path.
+	 *
+	 * @param name
+	 *            The name of the file (without file extension).
+	 * @param content
+	 *            Content to end up in the file.
+	 * @param fileExtension
+	 *            File extension to be used in the file path.
 	 * @return
 	 * @throws IOException
 	 */

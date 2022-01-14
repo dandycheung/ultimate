@@ -93,7 +93,7 @@ public class UltimateResult {
 	public String getLogLvl() {
 		return logLvl;
 	}
-	
+
 	/**
 	 * @return the logLvl
 	 */
@@ -103,11 +103,9 @@ public class UltimateResult {
 
 	@Override
 	public String toString() {
-		return "UltimateResult [shortDesc=" + shortDesc + ", longDesc="
-				+ longDesc + ", startLNr=" + startLNr + ", endLNr=" + endLNr
-				+ ", startCol=" + startCol + ", endCol=" + endCol + ", logLvl="
-				+ logLvl + ", type=" + type + "]";
+		return "UltimateResult [shortDesc=" + shortDesc + ", longDesc=" + longDesc + ", startLNr=" + startLNr
+				+ ", endLNr=" + endLNr + ", startCol=" + startCol + ", endCol=" + endCol + ", logLvl=" + logLvl
+				+ ", type=" + type + "]";
 	}
-	
-	
+
 }

@@ -93,7 +93,7 @@ public class JSONObject {
 		 * @return NULL.
 		 */
 		@Override
-		protected final Object clone() {
+		protected Object clone() {
 			return this;
 		}
 
@@ -155,9 +155,9 @@ public class JSONObject {
 	 */
 	public JSONObject(final JSONObject jo, final String[] names) {
 		this();
-		for (int i = 0; i < names.length; i += 1) {
+		for (final String name : names) {
 			try {
-				putOnce(names[i], jo.opt(names[i]));
+				putOnce(name, jo.opt(name));
 			} catch (final Exception ignore) {
 				// ignored exception
 			}
@@ -234,7 +234,7 @@ public class JSONObject {
 			final Iterator<?> i = map.entrySet().iterator();
 			while (i.hasNext()) {
 				@SuppressWarnings("unchecked")
-				final Map.Entry<Object, Object> e = ((Map.Entry<Object, Object>) i.next());
+				final Map.Entry<Object, Object> e = (Map.Entry<Object, Object>) i.next();
 				final Object value = e.getValue();
 				if (value != null) {
 					this.map.put(e.getKey(), wrap(value));
@@ -277,8 +277,7 @@ public class JSONObject {
 	public JSONObject(final Object object, final String names[]) {
 		this();
 		final Class<? extends Object> c = object.getClass();
-		for (int i = 0; i < names.length; i += 1) {
-			final String name = names[i];
+		for (final String name : names) {
 			try {
 				putOpt(name, c.getField(name).get(object));
 			} catch (final Exception ignore) {
@@ -457,10 +456,10 @@ public class JSONObject {
 	 */
 	public boolean getBoolean(final String key) throws JSONException {
 		final Object object = get(key);
-		if (object.equals(Boolean.FALSE) || (object instanceof String && ((String) object).equalsIgnoreCase("false"))) {
+		if (object.equals(Boolean.FALSE) || object instanceof String && ((String) object).equalsIgnoreCase("false")) {
 			return false;
-		} else if (object.equals(Boolean.TRUE)
-				|| (object instanceof String && ((String) object).equalsIgnoreCase("true"))) {
+		}
+		if (object.equals(Boolean.TRUE) || object instanceof String && ((String) object).equalsIgnoreCase("true")) {
 			return true;
 		}
 		throw new JSONException("JSONObject[" + quote(key) + "] is not a Boolean.");
@@ -927,9 +926,8 @@ public class JSONObject {
 		final boolean includeSuperClass = klass.getClassLoader() != null;
 
 		final Method[] methods = includeSuperClass ? klass.getMethods() : klass.getDeclaredMethods();
-		for (int i = 0; i < methods.length; i += 1) {
+		for (final Method method : methods) {
 			try {
-				final Method method = methods[i];
 				if (Modifier.isPublic(method.getModifiers())) {
 					final String name = method.getName();
 					String key = "";
@@ -1006,7 +1004,7 @@ public class JSONObject {
 	 *             If the key is null or if the number is invalid.
 	 */
 	public JSONObject put(final String key, final double value) throws JSONException {
-		this.put(key, new Double(value));
+		this.put(key, Double.valueOf(value));
 		return this;
 	}
 
@@ -1022,7 +1020,7 @@ public class JSONObject {
 	 *             If the key is null.
 	 */
 	public JSONObject put(final String key, final int value) throws JSONException {
-		this.put(key, new Integer(value));
+		this.put(key, Integer.valueOf(value));
 		return this;
 	}
 
@@ -1038,7 +1036,7 @@ public class JSONObject {
 	 *             If the key is null.
 	 */
 	public JSONObject put(final String key, final long value) throws JSONException {
-		this.put(key, new Long(value));
+		this.put(key, Long.valueOf(value));
 		return this;
 	}
 
@@ -1141,10 +1139,9 @@ public class JSONObject {
 
 		char b;
 		char c = 0;
-		final String hhhh;
 		int i;
 		final int len = string.length();
-		final StringBuffer sb = new StringBuffer(len + 4);
+		final StringBuilder sb = new StringBuilder(len + 4);
 
 		sb.append('"');
 		for (i = 0; i < len; i += 1) {
@@ -1237,19 +1234,18 @@ public class JSONObject {
 		 */
 
 		final char b = string.charAt(0);
-		if ((b >= '0' && b <= '9') || b == '.' || b == '-' || b == '+') {
+		if (b >= '0' && b <= '9' || b == '.' || b == '-' || b == '+') {
 			try {
-				if (string.indexOf('.') > -1 || string.indexOf('e') > -1 || string.indexOf('E') > -1) {
-					d = Double.valueOf(string);
-					if (!d.isInfinite() && !d.isNaN()) {
-						return d;
-					}
-				} else {
-					final Long myLong = new Long(string);
+				if (string.indexOf('.') <= -1 && string.indexOf('e') <= -1 && string.indexOf('E') <= -1) {
+					final Long myLong = Long.valueOf(string);
 					if (myLong.longValue() == myLong.intValue()) {
-						return new Integer(myLong.intValue());
+						return Integer.valueOf(myLong.intValue());
 					}
 					return myLong;
+				}
+				d = Double.valueOf(string);
+				if (!d.isInfinite() && !d.isNaN()) {
+					return d;
 				}
 			} catch (final Exception ignore) {
 				// ignore exception
@@ -1272,10 +1268,8 @@ public class JSONObject {
 				if (((Double) o).isInfinite() || ((Double) o).isNaN()) {
 					throw new JSONException("JSON does not allow non-finite numbers.");
 				}
-			} else if (o instanceof Float) {
-				if (((Float) o).isInfinite() || ((Float) o).isNaN()) {
-					throw new JSONException("JSON does not allow non-finite numbers.");
-				}
+			} else if (o instanceof Float && (((Float) o).isInfinite() || ((Float) o).isNaN())) {
+				throw new JSONException("JSON does not allow non-finite numbers.");
 			}
 		}
 	}
@@ -1315,7 +1309,7 @@ public class JSONObject {
 	public String toString() {
 		try {
 			final Iterator<Object> keys = keys();
-			final StringBuffer sb = new StringBuffer("{");
+			final StringBuilder sb = new StringBuilder("{");
 
 			while (keys.hasNext()) {
 				if (sb.length() > 1) {
@@ -1374,7 +1368,7 @@ public class JSONObject {
 		final Iterator<Object> keys = keys();
 		final int newindent = indent + indentFactor;
 		Object object;
-		final StringBuffer sb = new StringBuffer("{");
+		final StringBuilder sb = new StringBuilder("{");
 		if (length == 1) {
 			object = keys.next();
 			sb.append(quote(object.toString()));

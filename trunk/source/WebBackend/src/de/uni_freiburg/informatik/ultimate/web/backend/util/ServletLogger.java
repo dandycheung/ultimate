@@ -15,6 +15,7 @@ public class ServletLogger implements ILogger {
 		mDebug = debug;
 	}
 
+	@Override
 	public boolean isDebugEnabled() {
 		return mDebug;
 	}
@@ -47,32 +48,32 @@ public class ServletLogger implements ILogger {
 	}
 
 	@Override
-	public void fatal(Object msg, Throwable t) {
+	public void fatal(final Object msg, final Throwable t) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
-	public void error(Object msg, Throwable t) {
+	public void error(final Object msg, final Throwable t) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
-	public boolean isLogLevelEnabled(LogLevel level) {
+	public boolean isLogLevelEnabled(final LogLevel level) {
 		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
-	public void log(LogLevel level, String message) {
+	public void log(final LogLevel level, final String message) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
-	public void setLevel(LogLevel level) {
+	public void setLevel(final LogLevel level) {
 		// TODO Auto-generated method stub
-		
+
 	}
 }

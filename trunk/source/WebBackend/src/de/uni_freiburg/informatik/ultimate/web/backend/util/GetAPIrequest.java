@@ -6,19 +6,19 @@ public class GetAPIrequest {
 	public RessourceType ressourceType;
 	public TaskType taskType;
 	public String[] urlParts;
-	
-	public GetAPIrequest(HttpServletRequest request) {
+
+	public GetAPIrequest(final HttpServletRequest request) {
 		urlParts = getUrlParts(request.getPathInfo());
 		setRessource();
 		setTask();
 	}
-	
+
 	private void setTask() {
-		if ((urlParts == null) || (urlParts.length < 3)) {
+		if (urlParts == null || urlParts.length < 3) {
 			taskType = TaskType.UNKNOWN;
 			return;
 		}
-		
+
 		switch (urlParts[2]) {
 		case "get":
 			taskType = TaskType.GET;
@@ -32,13 +32,12 @@ public class GetAPIrequest {
 		}
 	}
 
-
 	private void setRessource() {
-		if ((urlParts == null) || (urlParts.length < 1)) {
+		if (urlParts == null || urlParts.length < 1) {
 			ressourceType = RessourceType.UNKNOWN;
 			return;
 		}
-		
+
 		switch (urlParts[1]) {
 		case "job":
 			ressourceType = RessourceType.JOB;
@@ -53,7 +52,7 @@ public class GetAPIrequest {
 		}
 	}
 
-	private String[] getUrlParts(String pathInfo) {
-		return (pathInfo != null) ? pathInfo.split("/") : null;
+	private String[] getUrlParts(final String pathInfo) {
+		return pathInfo != null ? pathInfo.split("/") : null;
 	}
 }

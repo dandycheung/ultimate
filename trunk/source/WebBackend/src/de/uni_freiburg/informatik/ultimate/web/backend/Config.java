@@ -2,21 +2,14 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.eclipse.jetty.util.log.Log;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 
 /**
+ * @formatter:off
  * WebBackend settings.
- * 
+ *
  * # Available settings:
  * Config.DEBUG	.......... // (bool) If true be more verbose.
  * Config.SERVE_WEBSITE .. // (bool) If true, the static front-end will be served at http://host:Config.PORT/Config.FRONTEND_ROUTE
@@ -24,7 +17,7 @@ import org.json.JSONObject;
  * Config.FRONTEND_PATH .. // (string) absolute path to the front-end root directory (/trunk/source/WebsiteStatic) in ultimate repo.
  * Config.FRONTEND_ROUTE . // (string) The URL slug the front-end will be served at (e.g. http://host:Config.PORT/website).
  * Config.BACKEND_ROUTE .. // (string) The URL slug the back-end will be served at (e.g. http://host:Config.PORT/api).
- *  
+ *
  * # How to change settings.
  * 	1. Uses default setting constants as defined here.
  * 	2. Overrides settings provided by a "web.config.properties" file.
@@ -36,8 +29,10 @@ import org.json.JSONObject;
  * 		--DWebBackend.FRONTEND_ROUTE="/website"
  * 		--DWebBackend.BACKEND_ROUTE="/api"
  * 		--DWebBackend.SETTINGS_WHITELIST="/path/to/your/settings_whitelist.json"
+ * @formatter:on
  */
 public class Config {
+
 	public static boolean DEBUG = true;
 	public static boolean SERVE_WEBSITE = true;
 	public static int PORT = 8080;
@@ -48,9 +43,9 @@ public class Config {
 	public static UserSettingsWhitelist USER_SETTINGS_WHITELIST;
 	public static String LOG_FILE_PATH = "ultimate_web_backend.log";
 	public static String LOG_LEVEL = "INFO";
-	
-	private final static String settingsFile = "web.config.properties";
-	private final static String propertyPrefix = "WebBackend.";
+
+	private static final String SETTINGS_FILE = "web.config.properties";
+	private static final String PROPERTY_PREFIX = "WebBackend.";
 
 	private static Properties appSettings = new Properties();
 
@@ -61,21 +56,18 @@ public class Config {
 		loadSettingsFile();
 		loadSettings();
 	}
-	
+
 	/**
 	 * Load settings file into Properties object.
 	 */
 	private static void loadSettingsFile() {
-		try {
-			final String settingsFilePath = loadString("SETTINGS_FILE", settingsFile);
-			Log.getRootLogger().info("Try loading settings file from: " + settingsFilePath);
-			final FileInputStream fileInputStream = new FileInputStream(settingsFilePath);
+		final String settingsFilePath = loadString("SETTINGS_FILE", SETTINGS_FILE);
+		try (final FileInputStream fileInputStream = new FileInputStream(settingsFilePath)) {
 			appSettings.load(fileInputStream);
-			fileInputStream.close();
-			
-			Log.getRootLogger().info("Settings file successfuly loaded.");
+			Log.getRootLogger().info(String.format("Loaded settings file from %s", settingsFilePath));
 		} catch (final IOException e) {
-			Log.getRootLogger().warn("Could not load settings file. Using defaults.");
+			Log.getRootLogger()
+					.warn(String.format("Could not load settings file from '%s', using defaults", settingsFilePath));
 			Log.getRootLogger().warn(e.getMessage());
 		}
 	}
@@ -84,6 +76,7 @@ public class Config {
 	 * Load available settings. Overrides the defaults by the results if any.
 	 */
 	private static void loadSettings() {
+		DEBUG = loadBoolean("DEBUG", DEBUG);
 		SERVE_WEBSITE = loadBoolean("SERVE_WEBSITE", SERVE_WEBSITE);
 		PORT = loadInteger("PORT", PORT);
 		FRONTEND_PATH = loadString("FRONTEND_PATH", FRONTEND_PATH);
@@ -95,67 +88,51 @@ public class Config {
 		LOG_LEVEL = loadString("LOG_LEVEL", LOG_LEVEL);
 	}
 
-
-	/**
-	 * Load the setting string named `propertyName`. 
-	 * Returns `defaultValue` if setting is not found. 
-	 * Prefers vmArguments before settings file.
-	 * 
-	 * @param propertyName
-	 * @param defaultValue
-	 * @return
-	 */
-	private static String loadString(String propertyName, String defaultValue) {
-		String result = defaultValue;
-		if (appSettings.get(propertyName) != null) {
-			result = (String) appSettings.get(propertyName);
+	private static Object loadObject(final String propertyName, final Object defaultValue) {
+		final Object sysPropertyResult = System.getProperty(PROPERTY_PREFIX + propertyName);
+		if (sysPropertyResult != null) {
+			return sysPropertyResult;
 		}
-		if (System.getProperty("WebBackend." + propertyName) != null) {
-			result = System.getProperty(propertyPrefix  + propertyName);
+		final Object appSettingResult = appSettings.get(propertyName);
+		if (appSettingResult != null) {
+			return appSettingResult;
 		}
-		
-		return result;
+		return defaultValue;
 	}
 
 	/**
-	 * Load the setting boolean named `propertyName`. 
-	 * Returns `defaultValue` if setting is not found. 
-	 * Prefers vmArguments before settings file.
-	 * 
+	 * Load the setting string named `propertyName`. Returns `defaultValue` if setting is not found. Prefers vmArguments
+	 * before settings file.
+	 *
 	 * @param propertyName
 	 * @param defaultValue
 	 * @return
 	 */
-	private static Boolean loadBoolean(String propertyName, boolean defaultValue) {
-		boolean result = defaultValue;
-		if (appSettings.get(propertyName) != null) {			
-			result = Boolean.parseBoolean((String) appSettings.get(propertyName));
-		}
-		if (System.getProperty("WebBackend." + propertyName) != null) {
-			result = Boolean.parseBoolean(System.getProperty("WebBackend." + propertyName));
-		}
-		
-		return result;
+	private static String loadString(final String propertyName, final String defaultValue) {
+		return (String) loadObject(propertyName, defaultValue);
 	}
-	
+
 	/**
-	 * Load the setting integer named `propertyName`. 
-	 * Returns `defaultValue` if setting is not found. 
-	 * Prefers vmArguments before settings file.
-	 * 
+	 * Load the setting boolean named `propertyName`. Returns `defaultValue` if setting is not found. Prefers
+	 * vmArguments before settings file.
+	 *
 	 * @param propertyName
 	 * @param defaultValue
 	 * @return
 	 */
-	private static Integer loadInteger(String propertyName, Integer defaultValue) {
-		Integer result = defaultValue;
-		if (appSettings.get(propertyName) != null) {			
-			result = Integer.parseInt((String) appSettings.get(propertyName));
-		}
-		if (System.getProperty("WebBackend." + propertyName) != null) {
-			result = Integer.parseInt(System.getProperty("WebBackend." + propertyName));
-		}
-		
-		return result;
+	private static boolean loadBoolean(final String propertyName, final boolean defaultValue) {
+		return (boolean) loadObject(propertyName, defaultValue);
+	}
+
+	/**
+	 * Load the setting integer named `propertyName`. Returns `defaultValue` if setting is not found. Prefers
+	 * vmArguments before settings file.
+	 *
+	 * @param propertyName
+	 * @param defaultValue
+	 * @return
+	 */
+	private static int loadInteger(final String propertyName, final Integer defaultValue) {
+		return (int) loadObject(propertyName, defaultValue);
 	}
 }

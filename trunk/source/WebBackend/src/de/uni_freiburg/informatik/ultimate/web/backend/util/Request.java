@@ -54,11 +54,10 @@ public class Request {
 	}
 
 	private String getId() {
-		if (this.getParameterList().containsKey("requestId")) {
+		if (getParameterList().containsKey("requestId")) {
 			return getSingleParameter("requestId");
-		} else {
-			return mRequest.getSession().getId();
 		}
+		return mRequest.getSession().getId();
 	}
 
 	public ServletLogger getLogger() {
@@ -68,7 +67,7 @@ public class Request {
 	public String getRequestId() {
 		return mId;
 	}
-	
+
 	public HttpSession getSession() {
 		return mRequest.getSession();
 	}
@@ -77,7 +76,7 @@ public class Request {
 		return mParameterList;
 	}
 
-	public String getSingleParameter(String parameterName) throws IllegalArgumentException{
+	public String getSingleParameter(final String parameterName) throws IllegalArgumentException {
 		final String[] parameters = getParameterList().get(parameterName);
 
 		if (parameters == null) {
@@ -90,10 +89,8 @@ public class Request {
 
 		return parameters[0];
 	}
-	
+
 	public JSONObject getParameterJSONObject() throws IOException, JSONException {
-		// final String jsonString = mRequest.getReader().lines().collect(Collectors.joining(System.lineSeparator()));
-		final JSONObject jsonParameter = new JSONObject(mParameterList);
-		return jsonParameter;
+		return new JSONObject(mParameterList);
 	}
 }

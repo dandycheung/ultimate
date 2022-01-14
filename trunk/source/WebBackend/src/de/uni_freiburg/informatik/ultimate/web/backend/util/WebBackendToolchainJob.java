@@ -24,17 +24,15 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 
 	private final JSONObject mResult;
 	private final ServletLogger mServletLogger;
-	private final Request mRequest;
 	private final File mToolchainFile;
 	private final String mId;
 
 	public WebBackendToolchainJob(final String name, final ICore<RunDefinition> core,
 			final IController<RunDefinition> controller, final ServletLogger logger, final File[] input,
-			final JSONObject result, final Request request, final File toolchainFile, final String id) {
+			final JSONObject result, final File toolchainFile, final String id) {
 		super(name, core, controller, logger, input);
 		mResult = result;
 		mServletLogger = logger;
-		mRequest = request;
 		mToolchainFile = toolchainFile;
 		mId = id;
 	}
@@ -123,8 +121,7 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 			logDir.mkdir();
 		}
 		mServletLogger.log("Moving input, setting and toolchain file to " + logDir.getAbsoluteFile());
-		for (int i = 0; i < mInputFiles.length; i++) {
-			final File file = mInputFiles[i];
+		for (final File file : mInputFiles) {
 			file.renameTo(new File(logDir, file.getName()));
 		}
 		if (mToolchainFile != null) {

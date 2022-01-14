@@ -2,6 +2,7 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -12,63 +13,71 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class UserSettingsWhitelist {
-	
-	private JSONObject mJSONWhitelist; 
-	
-	public UserSettingsWhitelist(String filePath) {
-		this.initFromFile(filePath);
+
+	private JSONObject mJSONWhitelist;
+
+	public UserSettingsWhitelist(final String filePath) {
+		initFromFile(filePath);
 	}
-	
+
 	/**
 	 * Check if "pluginId" is available in the whitelist.
+	 *
 	 * @param pluginId
 	 * @return
 	 */
-	public boolean PluginIdIsCovered(String pluginId) {
+	public boolean isPluginIdCovered(final String pluginId) {
 		try {
 			mJSONWhitelist.getJSONArray(pluginId);
-		} catch (JSONException e) {
+		} catch (final JSONException e) {
 			return false;
 		}
 		return true;
 	}
-	
+
 	/**
 	 * Check if "pluginId" has white-listed "key".
+	 *
 	 * @param pluginId
 	 * @param key
 	 * @return
 	 */
-	public boolean PluginKeyIsWhitelisted(String pluginId, String key) {
+	public boolean isPluginKeyWhitelisted(final String pluginId, final String key) {
 		try {
-			JSONArray plugin_keys = getPluginKeys(pluginId);
-			for (int i=0; i < plugin_keys.length(); i++) {
-				String plugin_key = (String) plugin_keys.get(i);
-				if (plugin_key.equals(key)) {
+			final JSONArray pluginKeys = getPluginKeys(pluginId);
+			for (int i = 0; i < pluginKeys.length(); i++) {
+				final String pluginKey = (String) pluginKeys.get(i);
+				if (pluginKey.equals(key)) {
 					return true;
 				}
 			}
-		} catch (JSONException e) {
-			return false;
+		} catch (final JSONException e) {
+			// skip malformed things
 		}
 		return false;
-		
+
 	}
-	
-	private JSONArray getPluginKeys(String pluginId) throws JSONException {
+
+	private JSONArray getPluginKeys(final String pluginId) throws JSONException {
 		return mJSONWhitelist.getJSONArray(pluginId);
 	}
 
-	private void initFromFile(String filePath) {
-		try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
-			String jsonString = lines.collect(Collectors.joining());
-			mJSONWhitelist = new JSONObject(jsonString);
-			Log.getRootLogger().info("Loaded User settings whitelist.");
-        } catch (IOException e) {
-        	Log.getRootLogger().warn("Could not load user settings whitelist. Skipping.");
-            e.printStackTrace();
-        } catch (JSONException e) {
-			e.printStackTrace();
+	private void initFromFile(final String filePath) {
+		final Path file = Paths.get(filePath);
+		if (Files.notExists(file)) {
+			mJSONWhitelist = new JSONObject();
+			Log.getRootLogger().warn(String.format(
+					"Could not load user settings whitelist from %s because the file or path does not exist", file));
+		} else {
+			try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
+				final String jsonString = lines.collect(Collectors.joining());
+				mJSONWhitelist = new JSONObject(jsonString);
+				Log.getRootLogger().info("Loaded user settings whitelist");
+			} catch (JSONException | IOException e) {
+				Log.getRootLogger().warn(
+						String.format("Could not load user settings whitelist from %s: %s", filePath, e.getMessage()));
+				mJSONWhitelist = new JSONObject();
+			}
 		}
 	}
 }

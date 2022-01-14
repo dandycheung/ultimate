@@ -2,7 +2,7 @@ package org.json;
 
 /**
  * The JSONException is thrown by the JSON.org classes when things are amiss.
- * 
+ *
  * @author JSON.org
  * @version 2010-12-24
  */
@@ -18,28 +18,28 @@ public class JSONException extends Exception {
 
 	/**
 	 * Constructs a JSONException with an explanatory message.
-	 * 
+	 *
 	 * @param message
 	 *            Detail about the reason for the exception.
 	 */
-	public JSONException(String message) {
+	public JSONException(final String message) {
 		super(message);
 	}
 
 	/**
 	 * Constructor.
-	 * 
+	 *
 	 * @param cause
 	 *            the cause for the exception.
 	 */
-	public JSONException(Throwable cause) {
+	public JSONException(final Throwable cause) {
 		super(cause.getMessage());
 		this.cause = cause;
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see java.lang.Throwable#getCause()
 	 */
 	@Override

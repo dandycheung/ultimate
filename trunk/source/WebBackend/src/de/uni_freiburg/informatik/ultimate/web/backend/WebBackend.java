@@ -13,7 +13,6 @@ import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.server.handler.ResourceHandler;
-import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
@@ -22,20 +21,19 @@ import org.eclipse.jetty.util.resource.PathResource;
 
 import de.uni_freiburg.informatik.ultimate.web.backend.util.CrossOriginFilter;
 
-
 public class WebBackend implements IApplication {
 
 	private Server mJettyServer;
 
 	public WebBackend() {
-
+		// no init necessary
 	}
 
 	@Override
 	public Object start(final IApplicationContext context) throws Exception {
 		Config.load();
 
-		initLogging();        
+		initLogging();
 		initJettyServer();
 
 		mJettyServer.start();
@@ -53,18 +51,18 @@ public class WebBackend implements IApplication {
 		}
 	}
 
-	private void initLogging() {
+	private static void initLogging() {
 		// Set log level
 		System.setProperty("org.eclipse.jetty.LEVEL", Config.LOG_LEVEL);
-		
+
 		// Redirect logging to file.
-        FileOutputStream outStream;
+		FileOutputStream outStream;
 		try {
 			outStream = new FileOutputStream(Config.LOG_FILE_PATH, true);
-			PrintStream logStream = new PrintStream(outStream);
+			final PrintStream logStream = new PrintStream(outStream);
 			System.setOut(logStream);
-	        System.setErr(logStream);
-		} catch (FileNotFoundException e) {
+			System.setErr(logStream);
+		} catch (final FileNotFoundException e) {
 			Log.getRootLogger().warn("Not able to log to '" + Config.LOG_FILE_PATH + "'");
 		}
 	}
@@ -76,19 +74,17 @@ public class WebBackend implements IApplication {
 		mJettyServer = new Server(Config.PORT);
 		final ContextHandlerCollection contexts = new ContextHandlerCollection();
 		mJettyServer.setHandler(contexts);
-		
 
 		// Serve the website (front-end) as static content.
 		if (Config.SERVE_WEBSITE) {
 			addStaticPathToContext(contexts, Paths.get(Config.FRONTEND_PATH), Config.FRONTEND_ROUTE);
-			Log.getRootLogger().info("Serving frontend (" + Paths.get(Config.FRONTEND_PATH) +") at route: " + Config.FRONTEND_ROUTE);
+			Log.getRootLogger().info(
+					"Serving frontend (" + Paths.get(Config.FRONTEND_PATH) + ") at route: " + Config.FRONTEND_ROUTE);
 		}
 
 		// Serve the API.
 		// Prepare Handler for API servlets.
-		final ServletContextHandler servlets = new ServletContextHandler(
-				contexts, "/", ServletContextHandler.SESSIONS
-		);
+		final ServletContextHandler servlets = new ServletContextHandler(contexts, "/", ServletContextHandler.SESSIONS);
 		// Enable CORS to allow ultimate back-end/front-end running on a separate port and domain.
 		enableCorsOnServletContextHandler(servlets);
 		// Add the API servlet.
@@ -119,8 +115,8 @@ public class WebBackend implements IApplication {
 	}
 
 	/**
-	 * Add CORS headers to the servlets in the servlet handler. 
-	 * Enables the servlets to be called from outside their served domain.
+	 * Add CORS headers to the servlets in the servlet handler. Enables the servlets to be called from outside their
+	 * served domain.
 	 *
 	 * @param servlets
 	 *            ServletContextHandler
