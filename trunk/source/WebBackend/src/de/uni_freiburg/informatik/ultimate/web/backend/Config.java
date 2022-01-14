@@ -3,6 +3,7 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
+import java.util.function.Function;
 
 import org.eclipse.jetty.util.log.Log;
 
@@ -88,14 +89,15 @@ public class Config {
 		LOG_LEVEL = loadString("LOG_LEVEL", LOG_LEVEL);
 	}
 
-	private static Object loadObject(final String propertyName, final Object defaultValue) {
+	private static <T> T loadObject(final String propertyName, final T defaultValue,
+			final Function<Object, T> converter) {
 		final Object sysPropertyResult = System.getProperty(PROPERTY_PREFIX + propertyName);
 		if (sysPropertyResult != null) {
-			return sysPropertyResult;
+			return converter.apply(sysPropertyResult);
 		}
 		final Object appSettingResult = appSettings.get(propertyName);
 		if (appSettingResult != null) {
-			return appSettingResult;
+			return converter.apply(appSettingResult);
 		}
 		return defaultValue;
 	}
@@ -109,7 +111,7 @@ public class Config {
 	 * @return
 	 */
 	private static String loadString(final String propertyName, final String defaultValue) {
-		return (String) loadObject(propertyName, defaultValue);
+		return loadObject(propertyName, defaultValue, String.class::cast);
 	}
 
 	/**
@@ -121,7 +123,7 @@ public class Config {
 	 * @return
 	 */
 	private static boolean loadBoolean(final String propertyName, final boolean defaultValue) {
-		return Boolean.parseBoolean((String) loadObject(propertyName, defaultValue));
+		return loadObject(propertyName, defaultValue, a -> Boolean.parseBoolean((String) a));
 	}
 
 	/**
@@ -133,6 +135,6 @@ public class Config {
 	 * @return
 	 */
 	private static int loadInteger(final String propertyName, final Integer defaultValue) {
-		return Integer.parseInt((String) loadObject(propertyName, defaultValue));
+		return loadObject(propertyName, defaultValue, a -> Integer.parseInt((String) a));
 	}
 }
