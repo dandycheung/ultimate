@@ -148,9 +148,7 @@
             <p class="card-text text-justify">{{this.description}}</p>
             <h5 class="card-title">Languages</h5>
             <p class="card-text">
-              {{#each this.languages}}
-              <span>{{this}}</span>
-              {{~/each}}
+              <span>{{joinStr this.languages}}</span>
             </p>
           </div>
           <div class="card-footer text-right">

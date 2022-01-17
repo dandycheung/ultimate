@@ -24,3 +24,7 @@ Handlebars.registerHelper('ifCond', function (v1, operator, v2, options) {
             return options.inverse(this);
     }
 });
+
+Handlebars.registerHelper('joinStr', function(args) {
+    return args.join(', ')
+});
