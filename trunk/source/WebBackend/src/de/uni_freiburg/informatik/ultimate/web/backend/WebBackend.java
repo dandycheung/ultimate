@@ -88,8 +88,8 @@ public class WebBackend implements IApplication {
 		// Enable CORS to allow ultimate back-end/front-end running on a separate port and domain.
 		enableCorsOnServletContextHandler(servlets);
 		// Add the API servlet.
-		servlets.addServlet(new ServletHolder(new UltimateAPIServlet()), Config.BACKEND_ROUTE + "/*");
-		Log.getRootLogger().info("Serving api at route: " + Config.BACKEND_ROUTE);
+		servlets.addServlet(new ServletHolder(new UltimateApiServlet()), Config.BACKEND_ROUTE + "/*");
+		Log.getRootLogger().info("Serving API at route: " + Config.BACKEND_ROUTE);
 	}
 
 	/**

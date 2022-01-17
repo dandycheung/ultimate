@@ -19,3 +19,5 @@ FRONTEND_ROUTE=/website
 # LOG_LEVEL (string) ...... : Logging verbosity. Choose from: ALL, DEBUG, INFO, WARN, OFF
 LOG_FILE_PATH=C:\\path\\to\\var\\log\\logfile.log
 LOG_LEVEL=INFO
+
+TMP_DIR=

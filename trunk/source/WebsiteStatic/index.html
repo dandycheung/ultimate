@@ -1,42 +1,43 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link rel="manifest" href="site.webmanifest">
-  <link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
 
-  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+<link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 
-  <link rel="stylesheet" href="css/normalize.css">
-  <link rel="stylesheet" href="css/bootstrap.min.css">
-  <link rel="stylesheet" href="css/open-iconic-bootstrap.min.css">
-  <link rel="stylesheet" href="css/main.css">
-  <link rel="stylesheet" href="css/editor.css">
+<link rel="stylesheet" href="css/normalize.css">
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/open-iconic-bootstrap.min.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/editor.css">
 
-  <meta name="theme-color" content="#fafafa">
-  <meta name="description" content="">
-  <title>Uni-Freiburg : SWT - Ultimate</title>
+<meta name="theme-color" content="#fafafa">
+<meta name="description" content="">
+<title>Uni-Freiburg : SWT - Ultimate</title>
 </head>
 <body>
-<div class="d-flex h-100 flex-column">
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-      <a class="navbar-brand" href="./">
-        <img src="img/ultimate_logo.png" width="30" height="30" class="d-inline-block align-top" alt="">
-        Ultimate
-      </a>
-      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar_content" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
+	<div class="d-flex h-100 flex-column">
+		<nav class="navbar navbar-expand-lg navbar-light bg-light">
+			<a class="navbar-brand" href="./"> <img
+				src="img/ultimate_logo.png" width="30" height="30"
+				class="d-inline-block align-top" alt=""> Ultimate
+			</a>
+			<button class="navbar-toggler" type="button" data-toggle="collapse"
+				data-target="#navbar_content" aria-controls="navbarSupportedContent"
+				aria-expanded="false" aria-label="Toggle navigation">
+				<span class="navbar-toggler-icon"></span>
+			</button>
 
-      <div class="collapse navbar-collapse" id="navbar_content">
-      </div>
-    </nav>
-    <div id="content" class="d-flex flex-column flex-grow-1"></div>
-</div>
+			<div class="collapse navbar-collapse" id="navbar_content"></div>
+		</nav>
+		<div id="content" class="d-flex flex-column flex-grow-1"></div>
+	</div>
 
-<script id="editor-message" type="text/x-handlebars-template">
+	<script id="editor-message" type="text/x-handlebars-template">
   <div class="toast  {{toast_classes}}" data-type="{{logLvl}}" data-start-line="{{startLNr}}"
        data-end-line="{{endLNr}}" data-start-col="{{startCol}}" data-end-col="{{endCol}}"
        role="alert" aria-live="assertive" aria-atomic="true" data-autohide="false">
@@ -63,7 +64,10 @@
       <hr>
       <div class="row">
         <div class="col-1">
-          <span>{{startLNr}}</span>
+          <span>
+  			{{#ifCond startLNr '!==' -1}}{{startLNr}}{{/ifCond}}
+            {{#ifCond startLNr '===' -1}}-{{/ifCond}}
+  		  </span>
         </div>
         <div class="col-1">
           <span>
@@ -78,7 +82,7 @@
     </div>
   </div>
 </script>
-<script id="tool-interface-template" type="text/x-handlebars-template">
+	<script id="tool-interface-template" type="text/x-handlebars-template">
   <div id="editor" class="flex-grow-1 flex-shrink-1"></div>
   <div id="messages" class="bg-light border-top top-shaddow p-1">
     <div class="btn col-12 float-right">
@@ -130,7 +134,7 @@
     </div>
   </div>
 </script>
-<script id="landing-page-template" type="text/x-handlebars-template">
+	<script id="landing-page-template" type="text/x-handlebars-template">
   <div class="row" id="description"></div>
   <div class="row tools">
     <h3>Tools</h3>
@@ -163,7 +167,7 @@
   <div class="row" id="developers"></div>
   <div class="row" id="dependencies"></div>
 </script>
-<script id="navbar-template" type="text/x-handlebars-template">
+	<script id="navbar-template" type="text/x-handlebars-template">
   <ul class="navbar-nav">
     {{#ifCond context.url.ui '!==' 'home'}}
       <li class="nav-item active">
@@ -222,19 +226,19 @@
   {{/ifCond}}
 </script>
 
-<script type="text/javascript" charset="utf-8" src="config/config.js"></script>
-<script src="js/vendor/modernizr-3.7.1.min.js"></script>
-<script src="js/vendor/jquery-3.4.1.min.js" ></script>
-<script src="js/vendor/bootstrap.bundle.min.js" ></script>
-<script src="js/vendor/handlebars.min-35d3fdb.js" ></script>
-<script src="js/handlebars-custom.js" ></script>
-<script src="js/vendor/ace-min/ace.js"></script>
-<script src="js/vendor/interact.min.js"></script>
-<script src="js/vendor/lz-string.min.js"></script>
-<script src="js/helpers.js" ></script>
-<script src="js/plugins.js"></script>
-<script src="js/tool_interface.js"></script>
-<script src="js/main.js"></script>
+	<script type="text/javascript" charset="utf-8" src="config/config.js"></script>
+	<script src="js/vendor/modernizr-3.7.1.min.js"></script>
+	<script src="js/vendor/jquery-3.4.1.min.js"></script>
+	<script src="js/vendor/bootstrap.bundle.min.js"></script>
+	<script src="js/vendor/handlebars.min-35d3fdb.js"></script>
+	<script src="js/handlebars-custom.js"></script>
+	<script src="js/vendor/ace-min/ace.js"></script>
+	<script src="js/vendor/interact.min.js"></script>
+	<script src="js/vendor/lz-string.min.js"></script>
+	<script src="js/helpers.js"></script>
+	<script src="js/plugins.js"></script>
+	<script src="js/tool_interface.js"></script>
+	<script src="js/main.js"></script>
 
 </body>
 </html>

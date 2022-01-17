@@ -3,26 +3,23 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Dictionary;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.JAXBException;
 
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.jobs.IJobManager;
 import org.eclipse.core.runtime.jobs.Job;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.osgi.framework.Bundle;
 import org.xml.sax.SAXException;
 
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.Activator;
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.PluginFactory;
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.SettingsManager;
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.ToolchainManager;
+import de.uni_freiburg.informatik.ultimate.core.coreplugin.UltimateCore;
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.services.ToolchainStorage;
 import de.uni_freiburg.informatik.ultimate.core.lib.toolchain.RunDefinition;
 import de.uni_freiburg.informatik.ultimate.core.lib.toolchain.ToolchainData;
@@ -32,72 +29,82 @@ import de.uni_freiburg.informatik.ultimate.core.model.IToolchainData;
 import de.uni_freiburg.informatik.ultimate.core.model.IUltimatePlugin;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceInitializer;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceProvider;
+import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILoggingService;
-import de.uni_freiburg.informatik.ultimate.util.CoreUtil;
-import de.uni_freiburg.informatik.ultimate.web.backend.util.APIResponse;
-import de.uni_freiburg.informatik.ultimate.web.backend.util.GetAPIrequest;
+import de.uni_freiburg.informatik.ultimate.web.backend.util.ApiResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.util.GetApiRequest;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.JobResult;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.Request;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.ServletLogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.WebBackendToolchainJob;
 
-public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefinition>, IUltimatePlugin {
+public class UltimateApiServlet extends HttpServlet implements ICore<RunDefinition>, IUltimatePlugin {
+
+	// TODO: A servlet should not implement ICore
 
 	private static final long serialVersionUID = 1L;
 	private static final boolean DEBUG = true;
-	private final ServletLogger mLogger;
+	private final ServletLogger mServletLogger;
 	private ToolchainManager mToolchainManager;
 	private final ToolchainStorage mCoreStorage;
 	private final SettingsManager mSettingsManager;
 	private final PluginFactory mPluginFactory;
 	private final ILoggingService mLoggingService;
-	private String mUltimateVersion;
+	private static String sUltimateVersion = new UltimateCore().getUltimateVersionString();
 
 	/**
 	 * Constructor.
 	 *
 	 * @see HttpServlet#HttpServlet()
 	 */
-	public UltimateAPIServlet() {
-		mLogger = new ServletLogger(this, "Servlet", DEBUG);
+	public UltimateApiServlet() {
+		mServletLogger = new ServletLogger(this, DEBUG);
 		mCoreStorage = new ToolchainStorage();
 		mLoggingService = mCoreStorage.getLoggingService();
-		mSettingsManager = new SettingsManager(mLogger);
+		final ILogger ultLogger = mLoggingService.getLogger(Activator.PLUGIN_ID);
+		mSettingsManager = new SettingsManager(ultLogger);
 		mSettingsManager.registerPlugin(this);
-		mPluginFactory = new PluginFactory(mSettingsManager, mLogger);
+		mPluginFactory = new PluginFactory(mSettingsManager, ultLogger);
 	}
 
 	/**
 	 * Process GET requests
 	 */
 	@Override
-	protected void doGet(final HttpServletRequest request, final HttpServletResponse response)
-			throws ServletException, IOException {
-		mLogger.logDebug("Connection from " + request.getRemoteAddr() + ", GET: " + request.getQueryString());
+	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) {
+		mServletLogger.debug("Connection from %s, GET: %s%s", request.getRemoteAddr(), request.getRequestURL(),
+				request.getQueryString() == null ? "" : "?" + request.getQueryString());
+		try {
+			processAPIGetRequest(request, response);
+		} catch (final IOException ex) {
+			mServletLogger.error("Exception during GET: ", ex);
+		}
 
-		processAPIGetRequest(request, response);
 	}
 
 	/**
 	 * Process POST requests
 	 */
 	@Override
-	protected void doPost(final HttpServletRequest request, final HttpServletResponse response)
-			throws ServletException, IOException {
-		mLogger.logDebug("Connection from " + request.getRemoteAddr() + ", POST: " + request.getRequestURI());
-		final ServletLogger sessionLogger = new ServletLogger(this, request.getSession().getId(), DEBUG);
+	protected void doPost(final HttpServletRequest request, final HttpServletResponse response) {
+		mServletLogger.debug("Connection from %s, POST: %s", request.getRemoteAddr(), request.getRequestURI());
+		final ServletLogger sessionLogger = new ServletLogger(this, DEBUG);
 		final Request internalRequest = new Request(request, sessionLogger);
+		try {
+			processAPIPostRequest(internalRequest, response);
+		} catch (final IOException ex) {
+			mServletLogger.error("Exception during POST: ", ex);
+		}
 
-		processAPIPostRequest(internalRequest, response);
 	}
 
 	private void processAPIGetRequest(final HttpServletRequest request, final HttpServletResponse response)
 			throws IOException {
-		final GetAPIrequest apiRequest = new GetAPIrequest(request);
-		final APIResponse apiResponse = new APIResponse(response);
+		final GetApiRequest apiRequest = new GetApiRequest(request);
+		final ApiResponse apiResponse = new ApiResponse(response);
 
 		try {
-			switch (apiRequest.ressourceType) {
+			switch (apiRequest.getRessourceType()) {
 			case VERSION:
 				apiResponse.put("ultimate_version", getUltimateVersionString());
 				break;
@@ -113,22 +120,22 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 		} catch (final Exception e) {
 			apiResponse.invalidRequest(e.getMessage());
 			if (DEBUG) {
-				e.printStackTrace();
+				mServletLogger.error("Invalid JSON in response", e);
 			}
 		}
 	}
 
-	private static void handleJobGetRequest(final GetAPIrequest apiRequest, final APIResponse apiResponse)
+	private static void handleJobGetRequest(final GetApiRequest apiRequest, final ApiResponse apiResponse)
 			throws JSONException, IOException {
-		if (apiRequest.urlParts.length < 4) {
+		if (apiRequest.getUrlParts().length < 4) {
 			apiResponse.setStatusError();
 			apiResponse.setMessage("No JobId provided.");
 			return;
 		}
 
-		final String jobId = apiRequest.urlParts[3];
+		final String jobId = apiRequest.getUrlParts()[3];
 
-		switch (apiRequest.taskType) {
+		switch (apiRequest.getTaskType()) {
 		case GET:
 			final JobResult jobResult = new JobResult(jobId);
 			jobResult.load();
@@ -144,7 +151,7 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 			break;
 		default:
 			apiResponse.setStatusError();
-			apiResponse.setMessage("Task not supported for ressource " + apiRequest.ressourceType);
+			apiResponse.setMessage("Task not supported for ressource " + apiRequest.getRessourceType());
 			break;
 		}
 	}
@@ -157,13 +164,13 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 	 */
 	private void processAPIPostRequest(final Request internalRequest, final HttpServletResponse response)
 			throws IOException {
-		final APIResponse apiResponse = new APIResponse(response);
+		final ApiResponse apiResponse = new ApiResponse(response);
 
 		try {
-			mLogger.logDebug("Process API POST request.");
+			mServletLogger.debug("Process API POST request.");
 
 			if (internalRequest.getParameterList().containsKey("action")) {
-				mLogger.logDebug("Initiate ultimate run for request: " + internalRequest.toString());
+				mServletLogger.debug("Initiate Ultimate run for request: %s", internalRequest.toString());
 				apiResponse.mergeJSON(initiateUltimateRun(internalRequest));
 			} else {
 				apiResponse.setStatusError();
@@ -173,7 +180,7 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 		} catch (final JSONException e) {
 			apiResponse.invalidRequest(e.getMessage());
 			if (DEBUG) {
-				e.printStackTrace();
+				mServletLogger.error("Invalid JSON in response", e);
 			}
 		}
 	}
@@ -189,16 +196,15 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 		try {
 			final String action = internalRequest.getSingleParameter("action");
 			if (!action.equals("execute")) {
-				internalRequest.getLogger().logDebug("Don't know how to handle action: " + action);
+				internalRequest.getLogger().debug("Don't know how to handle action: %s", action);
 				final JSONObject json = new JSONObject();
 				json.put("error", "Invalid request: Unknown `action` parameter ( " + action + ").");
-
 				return json;
 			}
 			final JSONObject json = new JSONObject();
 			json.put("requestId", internalRequest.getRequestId());
 			json.put("status", "creating");
-			final UltimateAPIController controller = new UltimateAPIController(internalRequest, json);
+			final UltimateApiController controller = new UltimateApiController(internalRequest, json);
 			final int status = controller.init(this);
 			mToolchainManager = new ToolchainManager(mLoggingService, mPluginFactory, controller);
 			if (status == 0) {
@@ -300,24 +306,7 @@ public class UltimateAPIServlet extends HttpServlet implements ICore<RunDefiniti
 
 	@Override
 	public String getUltimateVersionString() {
-		if (mUltimateVersion == null) {
-			final Bundle bundle = Platform.getBundle(Activator.PLUGIN_ID);
-			if (bundle == null) {
-				return "UNKNOWN";
-			}
-			final Dictionary<String, String> headers = bundle.getHeaders();
-			if (headers == null) {
-				return "UNKNOWN";
-			}
-
-			final String major = headers.get("Bundle-Version");
-			final String gitVersion = CoreUtil.readGitVersion(getClass().getClassLoader());
-			if (gitVersion == null) {
-				return major;
-			}
-			mUltimateVersion = major + "-" + gitVersion;
-		}
-		return mUltimateVersion;
+		return sUltimateVersion;
 	}
 
 	/************************* End ICore Implementation *********************/

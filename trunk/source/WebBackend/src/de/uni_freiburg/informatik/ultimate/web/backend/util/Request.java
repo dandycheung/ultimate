@@ -47,7 +47,7 @@ public class Request {
 					sb.append(s);
 					sb.append("}");
 				}
-				mLogger.logDebug(sb.toString());
+				mLogger.debug(sb.toString());
 			}
 		}
 		return paramList;

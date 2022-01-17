@@ -24,16 +24,14 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 
 	private final JSONObject mResult;
 	private final ServletLogger mServletLogger;
-	private final File mToolchainFile;
 	private final String mId;
 
 	public WebBackendToolchainJob(final String name, final ICore<RunDefinition> core,
 			final IController<RunDefinition> controller, final ServletLogger logger, final File[] input,
-			final JSONObject result, final File toolchainFile, final String id) {
+			final JSONObject result, final String id) {
 		super(name, core, controller, logger, input);
 		mResult = result;
 		mServletLogger = logger;
-		mToolchainFile = toolchainFile;
 		mId = id;
 	}
 
@@ -68,7 +66,7 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 
 			return convert(mToolchain.processToolchain(tpm));
 		} catch (final Throwable e) {
-			mServletLogger.log("Error running the Toolchain: " + e.getMessage());
+			mServletLogger.error("Error running the Toolchain: " + e.getMessage());
 			return handleException(e);
 		} finally {
 			tpm.done();
@@ -81,21 +79,21 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 		switch (result) {
 		case Ok:
 		case Cancel:
+		case Error:
 			try {
 				UltimateResultProcessor.processUltimateResults(mServletLogger,
 						mToolchain.getCurrentToolchainData().getServices(), mResult);
-				cleanupTempFiles();
-				storeResults();
-			} catch (final JSONException e) {
-				e.printStackTrace();
+			} catch (final JSONException ex) {
+				mServletLogger.error("Exception during result conversion", ex);
+				ex.printStackTrace();
 			}
-			return Status.OK_STATUS;
-		case Error:
-			cleanupTempFiles();
 			storeResults();
+			break;
 		default:
-			return super.convert(result);
+			mServletLogger.error("Unknown return code %s", result);
+			break;
 		}
+		return super.convert(result);
 	}
 
 	@Override
@@ -109,23 +107,9 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 			mResult.put("status", "done");
 			jobResult.setJson(mResult);
 			jobResult.store();
-			mServletLogger.log("Stored tollchain result to: " + jobResult.getFilePath());
+			mServletLogger.info("Stored toolchain result to: %s", jobResult.getJsonFile());
 		} catch (final Exception ex) {
-			ex.printStackTrace();
-		}
-	}
-
-	private void cleanupTempFiles() {
-		final File logDir = new File(System.getProperty("java.io.tmpdir") + File.separator + "log" + File.separator);
-		if (!logDir.exists()) {
-			logDir.mkdir();
-		}
-		mServletLogger.log("Moving input, setting and toolchain file to " + logDir.getAbsoluteFile());
-		for (final File file : mInputFiles) {
-			file.renameTo(new File(logDir, file.getName()));
-		}
-		if (mToolchainFile != null) {
-			mToolchainFile.renameTo(new File(logDir, mToolchainFile.getName()));
+			mServletLogger.error("Error while storing toolchain job result", ex);
 		}
 	}
 

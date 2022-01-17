@@ -2,6 +2,8 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.function.Function;
 
@@ -34,6 +36,10 @@ import org.eclipse.jetty.util.log.Log;
  */
 public class Config {
 
+	private Config() {
+		// do not instantiate config class
+	}
+
 	public static boolean DEBUG = true;
 	public static boolean SERVE_WEBSITE = true;
 	public static int PORT = 8080;
@@ -44,6 +50,7 @@ public class Config {
 	public static UserSettingsWhitelist USER_SETTINGS_WHITELIST;
 	public static String LOG_FILE_PATH = "ultimate_web_backend.log";
 	public static String LOG_LEVEL = "INFO";
+	public static String TMP_DIR = "";
 
 	private static final String SETTINGS_FILE = "web.config.properties";
 	private static final String PROPERTY_PREFIX = "WebBackend.";
@@ -87,6 +94,11 @@ public class Config {
 		USER_SETTINGS_WHITELIST = new UserSettingsWhitelist(loadString("SETTINGS_WHITELIST", SETTINGS_WHITELIST));
 		LOG_FILE_PATH = loadString("LOG_FILE_PATH", LOG_FILE_PATH);
 		LOG_LEVEL = loadString("LOG_LEVEL", LOG_LEVEL);
+		try {
+			TMP_DIR = loadPathString("TMP_DIR", Files.createTempDirectory("ultimate_webbackend").toString());
+		} catch (final IOException ex) {
+			throw new RuntimeException(ex);
+		}
 	}
 
 	private static <T> T loadObject(final String propertyName, final T defaultValue,
@@ -100,6 +112,14 @@ public class Config {
 			return converter.apply(appSettingResult);
 		}
 		return defaultValue;
+	}
+
+	private static String loadPathString(final String propertyName, final String defaultValue) {
+		final String path = loadObject(propertyName, defaultValue, String.class::cast);
+		if (Files.exists(Path.of(path))) {
+			return path;
+		}
+		return "";
 	}
 
 	/**

@@ -25,17 +25,17 @@ import de.uni_freiburg.informatik.ultimate.core.model.ICore;
 import de.uni_freiburg.informatik.ultimate.core.model.ISource;
 import de.uni_freiburg.informatik.ultimate.core.model.ITool;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchainData;
-import de.uni_freiburg.informatik.ultimate.core.model.IUltimatePlugin;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceInitializer;
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResult;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
 import de.uni_freiburg.informatik.ultimate.util.CoreUtil;
+import de.uni_freiburg.informatik.ultimate.web.backend.util.FileUtil;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.JobResult;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.Request;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.ServletLogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.WebBackendToolchainJob;
 
-public class UltimateAPIController implements IUltimatePlugin, IController<RunDefinition> {
+public class UltimateApiController implements IController<RunDefinition> {
 
 	private final ServletLogger mLogger;
 	private static final long TIMEOUT = 15 * 1000;
@@ -47,7 +47,7 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	private ICore<RunDefinition> mCore;
 	public static final boolean DEBUG = true;
 
-	public UltimateAPIController(final Request request, final JSONObject result) {
+	public UltimateApiController(final Request request, final JSONObject result) {
 		mLogger = request.getLogger();
 		mRequest = request;
 		mResult = result;
@@ -56,22 +56,22 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	public void run() {
 		// TODO: Allow timeout to be set in the API request and use it.
 		try {
-			final WebBackendToolchainJob job = new WebBackendToolchainJob(
-					"WebBackendToolchainJob for request " + mRequest.getRequestId(), mCore, this, mLogger,
-					new File[] { mInputFile }, mResult, mToolchainFile, mRequest.getRequestId());
+			final WebBackendToolchainJob job =
+					new WebBackendToolchainJob("WebBackendToolchainJob for request " + mRequest.getRequestId(), mCore,
+							this, mLogger, new File[] { mInputFile }, mResult, mRequest.getRequestId());
 			mResult.put("requestId", mRequest.getRequestId());
 			job.schedule();
 			mResult.put("status", "scheduled");
 			final JobResult jobResult = new JobResult(mRequest.getRequestId());
 			jobResult.setJson(mResult);
 			jobResult.store();
-		} catch (final Throwable t) {
-			mLogger.log("Failed to run Ultimate.");
+		} catch (final Exception t) {
+			mLogger.error("Failed to run Ultimate", t);
 			try {
-				mResult.put("error", "Failed to run ULTIMATE: " + t.getMessage());
+				mResult.put("error", "Failed to run Ultimate: " + t.getMessage());
 			} catch (final JSONException e) {
 				if (DEBUG) {
-					e.printStackTrace();
+					mLogger.fatal("Failed to run Ultimate", e);
 				}
 			}
 		}
@@ -84,17 +84,13 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	 * @return Updated UltimateServiceProvider
 	 */
 	private IUltimateServiceProvider addUserSettings(final IToolchainData<RunDefinition> tcData) {
-		final IUltimateServiceProvider services = tcData.getServices();
+		// TODO: DD: Check that this works as intended, in particular under multiple clients.
 
-		/*
-		 * // Debug: traverse the toolchain to log its content. RunDefinition tcRD = tcData.getRootElement();
-		 * ToolchainListType tc = tcRD.getToolchain(); List<Object> tcPluginOrSubchain = tc.getPluginOrSubchain(); for
-		 * (Object pluginOrSubchain : tcPluginOrSubchain) { mLogger.log(pluginOrSubchain.toString()); }
-		 */
+		final IUltimateServiceProvider services = tcData.getServices();
 
 		// Get the user settings from the request
 		try {
-			mLogger.log("Apply user settings to run configuration.");
+			mLogger.info("Apply user settings to run configuration.");
 			final JSONObject jsonParameter = new JSONObject(mRequest.getSingleParameter("user_settings"));
 			final JSONArray userSettings = jsonParameter.getJSONArray("user_settings");
 
@@ -105,8 +101,7 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 
 				// Check if the setting is in the white-list.
 				if (!Config.USER_SETTINGS_WHITELIST.isPluginKeyWhitelisted(pluginId, key)) {
-					mLogger.log(
-							"User setting for plugin=" + pluginId + " key=" + key + " is not in whitelist. Ignoring.");
+					mLogger.info("User setting for plugin=%s, key=%s is not in whitelist. Ignoring.", pluginId, key);
 					continue;
 				}
 
@@ -125,11 +120,11 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 					services.getPreferenceProvider(pluginId).put(key, userSetting.getLong("value"));
 					break;
 				default:
-					mLogger.log("User setting type " + userSetting.getString("type") + " is unknown. Ignoring");
+					mLogger.info("User setting type %s is unknown. Ignoring", userSetting.getString("type"));
 				}
 			}
 		} catch (final JSONException e) {
-			mLogger.log("Could not fetch user settings: " + e.getMessage());
+			mLogger.error("Could not fetch user settings: %s", e.getMessage());
 		}
 
 		return services;
@@ -165,31 +160,26 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 		mCore = core;
 
 		// Prepare {input, toolchain, settings} as temporary files.
-		mLogger.log("Prepare input files for RequestId: " + mRequest.getRequestId());
+		mLogger.info("Prepare input files for RequestId: %s", mRequest.getRequestId());
 		try {
 			final String timestamp = CoreUtil.getCurrentDateTimeAsString();
-			setInputFile(mRequest, timestamp);
-			setToolchainFile(mRequest, timestamp);
-			mLogger.log("Written temporary files to " + mInputFile.getParent() + " with timestamp " + timestamp);
+			setInputFile(mRequest);
+			setToolchainFile(mRequest);
+			mLogger.info("Written temporary files to %s with timestamp %s", mInputFile.getParent(), timestamp);
 		} catch (final IOException e) {
 			try {
 				mResult.put("error", "Internal server error: IO");
 			} catch (final JSONException eJson) {
-				if (DEBUG) {
-					eJson.printStackTrace();
-				}
+				mLogger.fatal("Error during IOException: %s", eJson);
 			}
-			mLogger.log("Internal server error: " + e.getClass().getSimpleName());
-			mLogger.logDebug(e.toString());
-
 			if (DEBUG) {
-				e.printStackTrace();
+				mLogger.fatal("Internal server error: %s", e);
+			} else {
+				mLogger.fatal("Internal server error: %s", e.getClass().getSimpleName());
 			}
 			return -1;
 		}
-
 		core.resetPreferences(false);
-
 		return 0;
 	}
 
@@ -236,25 +226,23 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	 * Set the temporary ultimate input file. As set by the web-frontend user in the editor.
 	 *
 	 * @param internalRequest
-	 * @param timestamp
 	 * @throws IOException
 	 */
-	private void setInputFile(final Request internalRequest, final String timestamp) throws IOException {
+	private void setInputFile(final Request internalRequest) throws IOException {
 		final String code = internalRequest.getSingleParameter("code");
 		final String fileExtension = internalRequest.getSingleParameter("code_file_extension");
-		mInputFile = writeTemporaryFile(timestamp + "_input", code, fileExtension);
+		mInputFile = writeTemporaryFile(mRequest.getRequestId() + "_input" + fileExtension, code);
 	}
 
 	/**
 	 * Set temporary settings file as sent by the web-frontend.
 	 *
 	 * @param internalRequest
-	 * @param timestamp
 	 * @throws IOException
 	 */
-	private void setToolchainFile(final Request internalRequest, final String timestamp) throws IOException {
-		final String ultimate_toolchain_xml = internalRequest.getSingleParameter("ultimate_toolchain_xml");
-		mToolchainFile = writeTemporaryFile(timestamp + "_toolchain", ultimate_toolchain_xml, ".xml");
+	private void setToolchainFile(final Request internalRequest) throws IOException {
+		final String tcXml = internalRequest.getSingleParameter("ultimate_toolchain_xml");
+		mToolchainFile = writeTemporaryFile(mRequest.getRequestId() + "_toolchain.xml", tcXml);
 	}
 
 	/**
@@ -264,17 +252,14 @@ public class UltimateAPIController implements IUltimatePlugin, IController<RunDe
 	 *            The name of the file (without file extension).
 	 * @param content
 	 *            Content to end up in the file.
-	 * @param fileExtension
-	 *            File extension to be used in the file path.
 	 * @return
 	 * @throws IOException
 	 */
-	private static File writeTemporaryFile(final String name, final String content, final String fileExtension)
-			throws IOException {
-		final File codeFile = File.createTempFile(name, fileExtension);
-		try (final Writer fstream = new OutputStreamWriter(new FileOutputStream(codeFile), StandardCharsets.UTF_8)) {
+	private static File writeTemporaryFile(final String name, final String content) throws IOException {
+		final File file = FileUtil.getTmpDir().toPath().resolve(name).toFile();
+		try (final Writer fstream = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8)) {
 			fstream.write(content);
 		}
-		return codeFile;
+		return file;
 	}
 }

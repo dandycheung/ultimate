@@ -1,5 +1,9 @@
 package de.uni_freiburg.informatik.ultimate.web.backend.util;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.Objects;
+
 import javax.servlet.http.HttpServlet;
 
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
@@ -8,72 +12,63 @@ import de.uni_freiburg.informatik.ultimate.util.CoreUtil;
 public class ServletLogger implements ILogger {
 
 	private final HttpServlet mServlet;
-	private final boolean mDebug;
+	private LogLevel mLogLevel;
 
-	public ServletLogger(final HttpServlet servlet, final String id, final boolean debug) {
+	public ServletLogger(final HttpServlet servlet, final boolean debug) {
 		mServlet = servlet;
-		mDebug = debug;
-	}
-
-	@Override
-	public boolean isDebugEnabled() {
-		return mDebug;
-	}
-
-	public void logDebug(final String message) {
-		if (!mDebug || message == null) {
-			return;
+		if (debug) {
+			mLogLevel = LogLevel.DEBUG;
+		} else {
+			mLogLevel = LogLevel.INFO;
 		}
-		final String stampedMsg = "[" + CoreUtil.getCurrentDateTimeAsString() + "][DEBUG] " + message;
-		mServlet.log(stampedMsg);
-		System.out.println(stampedMsg);
 	}
 
-	public void log(final String message) {
-		if (message == null) {
-			return;
-		}
-		final String stampedMsg = "[" + CoreUtil.getCurrentDateTimeAsString() + "] " + message;
-		mServlet.log(stampedMsg);
-		System.out.println(stampedMsg);
+	private static String addTimestamp(final LogLevel level, final String msg) {
+		return String.format("[%s][%s] %s", CoreUtil.getCurrentDateTimeAsString(), level, msg);
 	}
 
-	public void logException(final String message, final Throwable t) {
-		if (message == null) {
-			return;
+	private static String throwableToString(final Throwable t) {
+		if (t == null) {
+			return Objects.toString(t);
 		}
-		final String stampedMsg = "[" + CoreUtil.getCurrentDateTimeAsString() + "] " + message;
-		mServlet.log(stampedMsg, t);
-		System.out.println(stampedMsg + " " + t.toString());
+		final StringWriter sw = new StringWriter();
+		final PrintWriter pw = new PrintWriter(sw);
+		t.printStackTrace(pw);
+		sw.flush();
+		return sw.toString();
+	}
+
+	private static String objectToString(final Object msg) {
+		if (msg instanceof String) {
+			return (String) msg;
+		}
+		return Objects.toString(msg);
 	}
 
 	@Override
 	public void fatal(final Object msg, final Throwable t) {
-		// TODO Auto-generated method stub
-
+		log(LogLevel.FATAL, "%s %s", objectToString(msg), throwableToString(t));
 	}
 
 	@Override
 	public void error(final Object msg, final Throwable t) {
-		// TODO Auto-generated method stub
+		log(LogLevel.ERROR, "%s %s", objectToString(msg), throwableToString(t));
 
 	}
 
 	@Override
 	public boolean isLogLevelEnabled(final LogLevel level) {
-		// TODO Auto-generated method stub
-		return false;
+		return level.ordinal() >= mLogLevel.ordinal();
 	}
 
 	@Override
 	public void log(final LogLevel level, final String message) {
-		// TODO Auto-generated method stub
-
+		mServlet.log(addTimestamp(level, message));
 	}
 
 	@Override
 	public void setLevel(final LogLevel level) {
-		// TODO Auto-generated method stub
-
+		mLogLevel = level;
 	}
+
 }

@@ -49,19 +49,19 @@ public class UltimateResultProcessor {
 			final List<IResult> toolResults = entry.getValue();
 			for (final IResult result : toolResults) {
 				if (result instanceof StatisticsResult<?>) {
-					logger.log("Skipping result " + result.getLongDescription());
+					logger.info("Skipping result " + result.getLongDescription());
 					continue;
 				}
 				final UltimateResult jsonResult = processResult(logger, result);
 				jsonResults.add(new JSONObject(jsonResult));
-				logger.log("Added result: " + jsonResult.toString());
+				logger.info("Added result: " + jsonResult.toString());
 			}
 		}
 		json.put("results", new JSONArray(jsonResults.toArray(new JSONObject[jsonResults.size()])));
 	}
 
 	private static UltimateResult processResult(final ServletLogger logger, final IResult r) {
-		logger.log("Processing result " + r.getShortDescription());
+		logger.info("Processing result " + r.getShortDescription());
 		String type = "UNDEF";
 		final UltimateResult packagedResult = new UltimateResult();
 		if (r instanceof ExceptionOrErrorResult) {
@@ -119,7 +119,7 @@ public class UltimateResultProcessor {
 		if (r instanceof IResultWithLocation) {
 			final ILocation loc = ((IResultWithLocation) r).getLocation();
 			if (loc == null) {
-				logger.log("IResultWithLocation with getLocation()==null, ignoring...");
+				logger.info("IResultWithLocation with getLocation()==null, ignoring...");
 				setEmptyLocation(packagedResult);
 			} else {
 				packagedResult.startLNr = loc.getStartLine();
