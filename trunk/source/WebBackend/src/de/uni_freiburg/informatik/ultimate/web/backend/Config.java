@@ -55,7 +55,7 @@ public class Config {
 	private static final String SETTINGS_FILE = "web.config.properties";
 	private static final String PROPERTY_PREFIX = "WebBackend.";
 
-	private static Properties appSettings = new Properties();
+	private static final Properties APP_SETTINGS = new Properties();
 
 	/**
 	 * Load settings from web.config.properties file
@@ -71,7 +71,7 @@ public class Config {
 	private static void loadSettingsFile() {
 		final String settingsFilePath = loadString("SETTINGS_FILE", SETTINGS_FILE);
 		try (final FileInputStream fileInputStream = new FileInputStream(settingsFilePath)) {
-			appSettings.load(fileInputStream);
+			APP_SETTINGS.load(fileInputStream);
 			Log.getRootLogger().info(String.format("Loaded settings file from %s", settingsFilePath));
 		} catch (final IOException e) {
 			Log.getRootLogger()
@@ -107,7 +107,7 @@ public class Config {
 		if (sysPropertyResult != null) {
 			return converter.apply(sysPropertyResult);
 		}
-		final Object appSettingResult = appSettings.get(propertyName);
+		final Object appSettingResult = APP_SETTINGS.get(propertyName);
 		if (appSettingResult != null) {
 			return converter.apply(appSettingResult);
 		}

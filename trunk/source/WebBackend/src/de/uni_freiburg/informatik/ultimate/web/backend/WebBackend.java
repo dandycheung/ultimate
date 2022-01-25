@@ -5,6 +5,9 @@ import java.io.FileOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.EnumSet;
+
+import javax.servlet.DispatcherType;
 
 import org.eclipse.equinox.app.IApplication;
 import org.eclipse.equinox.app.IApplicationContext;
@@ -85,10 +88,12 @@ public class WebBackend implements IApplication {
 		// Serve the API.
 		// Prepare Handler for API servlets.
 		final ServletContextHandler servlets = new ServletContextHandler(contexts, "/", ServletContextHandler.SESSIONS);
-		// Enable CORS to allow ultimate back-end/front-end running on a separate port and domain.
-		enableCorsOnServletContextHandler(servlets);
 		// Add the API servlet.
 		servlets.addServlet(new ServletHolder(new UltimateApiServlet()), Config.BACKEND_ROUTE + "/*");
+
+		// Enable CORS to allow ultimate back-end/front-end running on a separate port and domain.
+		enableCorsOnServletContextHandler(servlets);
+
 		Log.getRootLogger().info("Serving API at route: " + Config.BACKEND_ROUTE);
 	}
 
@@ -118,14 +123,17 @@ public class WebBackend implements IApplication {
 	 * Add CORS headers to the servlets in the servlet handler. Enables the servlets to be called from outside their
 	 * served domain.
 	 *
-	 * @param servlets
+	 * @param contexts
 	 *            ServletContextHandler
 	 */
-	private static void enableCorsOnServletContextHandler(final ServletContextHandler servlets) {
-		final FilterHolder filterHolder = new FilterHolder(CrossOriginFilter.class);
-		filterHolder.setInitParameter("allowedOrigins", "*");
-		filterHolder.setInitParameter("allowedMethods", "GET, POST");
-		servlets.addFilter(filterHolder, "/*", null);
+	private static void enableCorsOnServletContextHandler(final ServletContextHandler contexts) {
+		final FilterHolder cors = new FilterHolder(new CrossOriginFilter());
+		contexts.addFilter(cors, "/*", EnumSet.of(DispatcherType.REQUEST));
+
+		cors.setInitParameter(CrossOriginFilter.ALLOWED_ORIGINS_PARAM, "*");
+		cors.setInitParameter(CrossOriginFilter.ACCESS_CONTROL_ALLOW_ORIGIN_HEADER, "*");
+		cors.setInitParameter(CrossOriginFilter.ALLOWED_METHODS_PARAM, "GET,POST");
+
 	}
 
 }
