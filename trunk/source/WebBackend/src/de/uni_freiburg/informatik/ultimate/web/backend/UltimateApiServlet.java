@@ -3,6 +3,7 @@ package de.uni_freiburg.informatik.ultimate.web.backend;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Optional;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -11,8 +12,6 @@ import javax.xml.bind.JAXBException;
 
 import org.eclipse.core.runtime.jobs.IJobManager;
 import org.eclipse.core.runtime.jobs.Job;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.xml.sax.SAXException;
 
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.Activator;
@@ -31,9 +30,12 @@ import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceIni
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceProvider;
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILoggingService;
-import de.uni_freiburg.informatik.ultimate.web.backend.util.ApiResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.ApiResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.ErrorResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.GenericResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.ToolchainResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.VersionResponse;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.GetApiRequest;
-import de.uni_freiburg.informatik.ultimate.web.backend.util.JobResult;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.Request;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.ServletLogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.WebBackendToolchainJob;
@@ -101,58 +103,44 @@ public class UltimateApiServlet extends HttpServlet implements ICore<RunDefiniti
 	private void processAPIGetRequest(final HttpServletRequest request, final HttpServletResponse response)
 			throws IOException {
 		final GetApiRequest apiRequest = new GetApiRequest(request);
-		final ApiResponse apiResponse = new ApiResponse(response);
+		final ApiResponse apiResponse = new ApiResponse();
 
 		try {
 			switch (apiRequest.getRessourceType()) {
 			case VERSION:
-				apiResponse.put("ultimate_version", getUltimateVersionString());
+				new VersionResponse(getUltimateVersionString()).write(response);
 				break;
 			case JOB:
-				handleJobGetRequest(apiRequest, apiResponse);
+				handleJobGetRequest(apiRequest, apiResponse).write(response);
 				break;
 			default:
-				apiResponse.setStatusError();
-				apiResponse.setMessage("unknown request.");
+				new ErrorResponse("unknown request").write(response);
 				break;
 			}
-			apiResponse.write();
-		} catch (final Exception e) {
-			apiResponse.invalidRequest(e.getMessage());
-			if (DEBUG) {
-				mServletLogger.error("Invalid JSON in response", e);
-			}
+		} catch (final IOException e) {
+			new ErrorResponse(e.getMessage()).write(response);
+			mServletLogger.error("IOException during response", e);
 		}
 	}
 
-	private static void handleJobGetRequest(final GetApiRequest apiRequest, final ApiResponse apiResponse)
-			throws JSONException, IOException {
+	private ApiResponse handleJobGetRequest(final GetApiRequest apiRequest, final ApiResponse apiResponse)
+			throws IOException {
 		if (apiRequest.getUrlParts().length < 4) {
-			apiResponse.setStatusError();
-			apiResponse.setMessage("No JobId provided.");
-			return;
+			return new ErrorResponse("No JobId provided");
 		}
 
 		final String jobId = apiRequest.getUrlParts()[3];
-
 		switch (apiRequest.getTaskType()) {
 		case GET:
-			final JobResult jobResult = new JobResult(jobId);
-			jobResult.load();
-			apiResponse.mergeJSON(jobResult.getJson());
-			break;
-		case DELETE:
-			final boolean canceled = cancelToolchainJob(jobId);
-			if (!canceled) {
-				apiResponse.setStatusError();
+			final Optional<ToolchainResponse> toolchainResponse = ToolchainResponse.load(mServletLogger, jobId);
+			if (toolchainResponse.isEmpty()) {
+				return new ErrorResponse("Unknown JobId");
 			}
-			final String message = canceled ? "Job " + jobId + " canceled." : "No unfinished job " + jobId + " found.";
-			apiResponse.setMessage(message);
-			break;
+			return toolchainResponse.get();
+		case DELETE:
+			return cancelToolchainJob(jobId);
 		default:
-			apiResponse.setStatusError();
-			apiResponse.setMessage("Task not supported for ressource " + apiRequest.getRessourceType());
-			break;
+			return new ErrorResponse("Task not supported for ressource " + apiRequest.getRessourceType());
 		}
 	}
 
@@ -164,71 +152,57 @@ public class UltimateApiServlet extends HttpServlet implements ICore<RunDefiniti
 	 */
 	private void processAPIPostRequest(final Request internalRequest, final HttpServletResponse response)
 			throws IOException {
-		final ApiResponse apiResponse = new ApiResponse(response);
-
 		try {
 			mServletLogger.debug("Process API POST request.");
-
 			if (internalRequest.getParameterList().containsKey("action")) {
 				mServletLogger.debug("Initiate Ultimate run for request: %s", internalRequest.toString());
-				apiResponse.mergeJSON(initiateUltimateRun(internalRequest));
+				scheduleUltimateRun(internalRequest).write(response);
 			} else {
-				apiResponse.setStatusError();
-				apiResponse.setMessage("Invalid request: Missing `action` parameter.");
+				new ErrorResponse("Invalid request: Missing `action` parameter.").write(response);
 			}
-			apiResponse.write();
-		} catch (final JSONException e) {
-			apiResponse.invalidRequest(e.getMessage());
-			if (DEBUG) {
-				mServletLogger.error("Invalid JSON in response", e);
-			}
+
+		} catch (final IOException e) {
+			new ErrorResponse(e.getMessage()).write(response);
+			mServletLogger.error("IOException during POST", e);
 		}
 	}
 
 	/**
 	 * Initiate ultimate run for the request. Return the results as a json object.
 	 *
-	 * @param internalRequest
-	 * @return
-	 * @throws JSONException
 	 */
-	private JSONObject initiateUltimateRun(final Request internalRequest) throws JSONException {
+	private ApiResponse scheduleUltimateRun(final Request request) {
 		try {
-			final String action = internalRequest.getSingleParameter("action");
+			final String action = request.getSingleParameter("action");
 			if (!action.equals("execute")) {
-				internalRequest.getLogger().debug("Don't know how to handle action: %s", action);
-				final JSONObject json = new JSONObject();
-				json.put("error", "Invalid request: Unknown `action` parameter ( " + action + ").");
-				return json;
+				request.getLogger().debug("Don't know how to handle action: %s", action);
+				return new ErrorResponse("Invalid request: Unknown `action` parameter ( " + action + ").");
 			}
-			final JSONObject json = new JSONObject();
-			json.put("requestId", internalRequest.getRequestId());
-			json.put("status", "creating");
-			final UltimateApiController controller = new UltimateApiController(internalRequest, json);
+
+			final ToolchainResponse tcResponse = new ToolchainResponse(request.getRequestId());
+			tcResponse.setStatus("creating");
+			final UltimateApiController controller = new UltimateApiController(request);
 			final int status = controller.init(this);
 			mToolchainManager = new ToolchainManager(mLoggingService, mPluginFactory, controller);
 			if (status == 0) {
 				controller.run();
 			}
 			mToolchainManager.close();
-			return json;
+			return tcResponse;
 		} catch (final IllegalArgumentException e) {
-			final JSONObject json = new JSONObject();
-			json.put("error", "Invalid request: " + e.getMessage());
-			return json;
+			return new ErrorResponse("Invalid request: " + e.getMessage());
 		}
 	}
 
-	private static boolean cancelToolchainJob(final String jobId) {
-		final Job[] jobs = getPendingToolchainJobs();
-		for (final Job job2 : jobs) {
-			final WebBackendToolchainJob job = (WebBackendToolchainJob) job2;
-			if (job.getId().equals(jobId)) {
-				job.cancelToolchain();
-				return true;
+	private static ApiResponse cancelToolchainJob(final String jobId) {
+		for (final Job job : getPendingToolchainJobs()) {
+			final WebBackendToolchainJob tcJob = (WebBackendToolchainJob) job;
+			if (tcJob.getId().equals(jobId)) {
+				tcJob.cancelToolchain();
+				return new GenericResponse(String.format("JobId %s canceled", jobId));
 			}
 		}
-		return false;
+		return new ErrorResponse("Unknown JobId");
 	}
 
 	/**

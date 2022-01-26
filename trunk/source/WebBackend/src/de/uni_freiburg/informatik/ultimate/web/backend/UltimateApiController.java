@@ -13,10 +13,11 @@ import java.util.Map;
 
 import javax.xml.bind.JAXBException;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.xml.sax.SAXException;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
+import com.google.gson.reflect.TypeToken;
 
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.Activator;
 import de.uni_freiburg.informatik.ultimate.core.lib.toolchain.RunDefinition;
@@ -29,8 +30,8 @@ import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceIni
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResult;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
 import de.uni_freiburg.informatik.ultimate.util.CoreUtil;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.ToolchainResponse;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.FileUtil;
-import de.uni_freiburg.informatik.ultimate.web.backend.util.JobResult;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.Request;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.ServletLogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.util.WebBackendToolchainJob;
@@ -43,37 +44,31 @@ public class UltimateApiController implements IController<RunDefinition> {
 	private File mToolchainFile;
 	private File mSettingsFile;
 	private final Request mRequest;
-	private final JSONObject mResult;
 	private ICore<RunDefinition> mCore;
 	public static final boolean DEBUG = true;
 
-	public UltimateApiController(final Request request, final JSONObject result) {
+	public UltimateApiController(final Request request) {
 		mLogger = request.getLogger();
 		mRequest = request;
-		mResult = result;
 	}
 
 	public void run() {
-		// TODO: Allow timeout to be set in the API request and use it.
+
+		final ToolchainResponse tcResponse = new ToolchainResponse(mRequest.getRequestId());
 		try {
 			final WebBackendToolchainJob job =
 					new WebBackendToolchainJob("WebBackendToolchainJob for request " + mRequest.getRequestId(), mCore,
-							this, mLogger, new File[] { mInputFile }, mResult, mRequest.getRequestId());
-			mResult.put("requestId", mRequest.getRequestId());
+							this, mLogger, new File[] { mInputFile }, mRequest.getRequestId());
 			job.schedule();
-			mResult.put("status", "scheduled");
-			final JobResult jobResult = new JobResult(mRequest.getRequestId());
-			jobResult.setJson(mResult);
-			jobResult.store();
+
 		} catch (final Exception t) {
 			mLogger.error("Failed to run Ultimate", t);
-			try {
-				mResult.put("error", "Failed to run Ultimate: " + t.getMessage());
-			} catch (final JSONException e) {
-				if (DEBUG) {
-					mLogger.fatal("Failed to run Ultimate", e);
-				}
-			}
+			tcResponse.setErrorMessage("Failed to run Ultimate: " + t.getMessage());
+		}
+		try {
+			tcResponse.store(mLogger);
+		} catch (final IOException ex) {
+			mLogger.error("Failed to store toolchain response", ex);
 		}
 	}
 
@@ -84,47 +79,48 @@ public class UltimateApiController implements IController<RunDefinition> {
 	 * @return Updated UltimateServiceProvider
 	 */
 	private IUltimateServiceProvider addUserSettings(final IToolchainData<RunDefinition> tcData) {
-		// TODO: DD: Check that this works as intended, in particular under multiple clients.
-
-		final IUltimateServiceProvider services = tcData.getServices();
-
+		// TODO: Add timeout to the API request and use it.
 		// Get the user settings from the request
+		final List<Map<String, String>> userSettings;
 		try {
 			mLogger.info("Apply user settings to run configuration.");
-			final JSONObject jsonParameter = new JSONObject(mRequest.getSingleParameter("user_settings"));
-			final JSONArray userSettings = jsonParameter.getJSONArray("user_settings");
+			final String usParam = mRequest.getSingleParameter("user_settings");
+			final Map<String, List<Map<String, String>>> parsed =
+					new Gson().fromJson(usParam, new TypeToken<Map<String, List<Map<String, String>>>>() {
+					}.getType());
+			userSettings = parsed.get("user_settings");
 
-			for (int i = 0; i < userSettings.length(); i++) {
-				final JSONObject userSetting = userSettings.getJSONObject(i);
-				final String pluginId = userSetting.getString("plugin_id");
-				final String key = userSetting.getString("key");
-
-				// Check if the setting is in the white-list.
-				if (!Config.USER_SETTINGS_WHITELIST.isPluginKeyWhitelisted(pluginId, key)) {
-					mLogger.info("User setting for plugin=%s, key=%s is not in whitelist. Ignoring.", pluginId, key);
-					continue;
-				}
-
-				// Apply the setting.
-				switch (userSetting.getString("type")) {
-				case "bool":
-					services.getPreferenceProvider(pluginId).put(key, userSetting.getBoolean("value"));
-					break;
-				case "int":
-					services.getPreferenceProvider(pluginId).put(key, userSetting.getInt("value"));
-					break;
-				case "string":
-					services.getPreferenceProvider(pluginId).put(key, userSetting.getString("value"));
-					break;
-				case "real":
-					services.getPreferenceProvider(pluginId).put(key, userSetting.getLong("value"));
-					break;
-				default:
-					mLogger.info("User setting type %s is unknown. Ignoring", userSetting.getString("type"));
-				}
-			}
-		} catch (final JSONException e) {
+		} catch (final JsonParseException e) {
 			mLogger.error("Could not fetch user settings: %s", e.getMessage());
+			return tcData.getServices();
+		}
+
+		// TODO: DD: Check that this works as intended, in particular under multiple clients.
+		final IUltimateServiceProvider services = tcData.getServices()
+				.registerPreferenceLayer(UltimateApiController.class, mCore.getRegisteredUltimatePluginIDs());
+
+		for (final Map<String, String> userSetting : userSettings) {
+			final String pluginId = userSetting.get("plugin_id");
+			final String key = userSetting.get("key");
+
+			// Check if the setting is in the white-list.
+			if (!Config.USER_SETTINGS_WHITELIST.isPluginKeyWhitelisted(pluginId, key)) {
+				mLogger.info("User setting for plugin=%s, key=%s is not in whitelist. Ignoring.", pluginId, key);
+				continue;
+			}
+
+			// Apply the setting.
+			switch (userSetting.get("type")) {
+			case "bool":
+			case "int":
+			case "string":
+			case "real":
+				services.getPreferenceProvider(pluginId).put(key, userSetting.get("value"));
+				break;
+			default:
+				mLogger.info("User setting type %s is unknown. Ignoring", userSetting.get("type"));
+				break;
+			}
 		}
 
 		return services;
@@ -158,7 +154,6 @@ public class UltimateApiController implements IController<RunDefinition> {
 		}
 
 		mCore = core;
-
 		// Prepare {input, toolchain, settings} as temporary files.
 		mLogger.info("Prepare input files for RequestId: %s", mRequest.getRequestId());
 		try {
@@ -168,15 +163,13 @@ public class UltimateApiController implements IController<RunDefinition> {
 			mLogger.info("Written temporary files to %s with timestamp %s", mInputFile.getParent(), timestamp);
 		} catch (final IOException e) {
 			try {
-				mResult.put("error", "Internal server error: IO");
-			} catch (final JSONException eJson) {
-				mLogger.fatal("Error during IOException: %s", eJson);
+				final ToolchainResponse tcResponse = new ToolchainResponse(mRequest.getRequestId());
+				tcResponse.setErrorMessage("Internal server error: IO");
+				tcResponse.store(mLogger);
+			} catch (final IOException ex) {
+				mLogger.fatal("Error during IOException: %s", ex);
 			}
-			if (DEBUG) {
-				mLogger.fatal("Internal server error: %s", e);
-			} else {
-				mLogger.fatal("Internal server error: %s", e.getClass().getSimpleName());
-			}
+			mLogger.fatal("Internal server error: %s", e);
 			return -1;
 		}
 		core.resetPreferences(false);

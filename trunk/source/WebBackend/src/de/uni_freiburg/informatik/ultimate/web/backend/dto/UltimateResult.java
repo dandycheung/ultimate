@@ -3,7 +3,7 @@
  * and easily sent via JSON and interpreted with JS. This means i.e. you should
  * avoid complex data structures in this class!
  */
-package de.uni_freiburg.informatik.ultimate.web.backend.util;
+package de.uni_freiburg.informatik.ultimate.web.backend.dto;
 
 /**
  * @author Markus Lindenmann
@@ -15,90 +15,98 @@ public class UltimateResult {
 	/**
 	 * Short description, shown in the annotation.
 	 */
-	String shortDesc;
+	private String shortDesc;
 	/**
 	 * Long description, shown in a table or other listing.
 	 */
-	String longDesc;
+	private String longDesc;
 	/**
 	 * Start line number of the result.
 	 */
-	int startLNr;
+	private int startLNr;
 	/**
 	 * End line number of the result
 	 */
-	int endLNr;
+	private int endLNr;
 	/**
 	 * Start column index of the result.
 	 */
-	int startCol;
+	private int startCol;
 	/**
 	 * End column index of the result.
 	 */
-	int endCol;
+	private int endCol;
 	/**
 	 * Type of the error. I.e. "warning", "error" or "info".
 	 */
-	String logLvl;
+	private String logLvl;
 	/**
 	 * Type of the Ultimate result (i.e. CounterExample, Invariant, ...).
 	 */
-	String type;
+	private String type;
 
-	/**
-	 * @return the shortDesc
-	 */
 	public String getShortDesc() {
 		return shortDesc;
 	}
 
-	/**
-	 * @return the longDesc
-	 */
 	public String getLongDesc() {
 		return longDesc;
 	}
 
-	/**
-	 * @return the startLNr
-	 */
 	public int getStartLNr() {
 		return startLNr;
 	}
 
-	/**
-	 * @return the endLNr
-	 */
 	public int getEndLNr() {
 		return endLNr;
 	}
 
-	/**
-	 * @return the startCol
-	 */
 	public int getStartCol() {
 		return startCol;
 	}
 
-	/**
-	 * @return the endCol
-	 */
 	public int getEndCol() {
 		return endCol;
 	}
 
-	/**
-	 * @return the logLvl
-	 */
 	public String getLogLvl() {
 		return logLvl;
 	}
 
-	/**
-	 * @return the logLvl
-	 */
 	public String getType() {
 		return type;
+	}
+
+	public void setShortDesc(final String shortDesc) {
+		this.shortDesc = shortDesc;
+	}
+
+	public void setLongDesc(final String longDesc) {
+		this.longDesc = longDesc;
+	}
+
+	public void setStartLNr(final int startLNr) {
+		this.startLNr = startLNr;
+	}
+
+	public void setEndLNr(final int endLNr) {
+		this.endLNr = endLNr;
+	}
+
+	public void setStartCol(final int startCol) {
+		this.startCol = startCol;
+	}
+
+	public void setEndCol(final int endCol) {
+		this.endCol = endCol;
+	}
+
+	public void setLogLvl(final String logLvl) {
+		this.logLvl = logLvl;
+	}
+
+	public void setType(final String type) {
+		this.type = type;
 	}
 
 	@Override

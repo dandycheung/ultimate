@@ -1,15 +1,11 @@
 package de.uni_freiburg.informatik.ultimate.web.backend.util;
 
-import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-
-import org.json.JSONException;
-import org.json.JSONObject;
 
 public class Request {
 	private final Map<String, String[]> mParameterList;
@@ -88,9 +84,5 @@ public class Request {
 		}
 
 		return parameters[0];
-	}
-
-	public JSONObject getParameterJSONObject() throws IOException, JSONException {
-		return new JSONObject(mParameterList);
 	}
 }

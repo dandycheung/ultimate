@@ -5,10 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import de.uni_freiburg.informatik.ultimate.core.lib.results.AllSpecificationsHoldResult;
 import de.uni_freiburg.informatik.ultimate.core.lib.results.CounterExampleResult;
 import de.uni_freiburg.informatik.ultimate.core.lib.results.ExceptionOrErrorResult;
@@ -32,20 +28,25 @@ import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithLocatio
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithSeverity;
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithSeverity.Severity;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.UltimateResult;
 
-public class UltimateResultProcessor {
+public class UltimateResultConverter {
 
 	private static final String TYPE_INVARIANT = "invariant";
 	private static final String LVL_WARNING = "warning";
 	private static final String LVL_INFO = "info";
 	private static final String LVL_ERROR = "error";
 
-	public static void processUltimateResults(final ServletLogger logger, final IUltimateServiceProvider services,
-			final JSONObject json) throws JSONException {
+	private UltimateResultConverter() {
+		// do not instantiate utility class
+	}
+
+	public static List<UltimateResult> processUltimateResults(final ServletLogger logger,
+			final IUltimateServiceProvider services) {
 		// get Result from Ultimate
 		final Map<String, List<IResult>> results = services.getResultService().getResults();
 		// add result to the json object
-		final List<JSONObject> jsonResults = new ArrayList<>();
+		final List<UltimateResult> rtr = new ArrayList<>();
 		for (final Entry<String, List<IResult>> entry : results.entrySet()) {
 			final List<IResult> toolResults = entry.getValue();
 			for (final IResult result : toolResults) {
@@ -53,12 +54,12 @@ public class UltimateResultProcessor {
 					logger.info("Skipping result " + result.getLongDescription());
 					continue;
 				}
-				final UltimateResult jsonResult = processResult(logger, result);
-				jsonResults.add(new JSONObject(jsonResult));
-				logger.info("Added result: " + jsonResult.toString());
+				final UltimateResult resultDto = processResult(logger, result);
+				rtr.add(resultDto);
+				logger.info("Added result: %s", resultDto);
 			}
 		}
-		json.put("results", new JSONArray(jsonResults.toArray(new JSONObject[jsonResults.size()])));
+		return rtr;
 	}
 
 	private static UltimateResult processResult(final ServletLogger logger, final IResult r) {
@@ -136,33 +137,32 @@ public class UltimateResultProcessor {
 
 		final UltimateResult packagedResult = new UltimateResult();
 
-		packagedResult.logLvl = logLvl;
-		// TODO : Add new "Out of resource" result here ...
+		packagedResult.setLogLvl(logLvl);
 		if (r instanceof IResultWithLocation) {
 			final ILocation loc = ((IResultWithLocation) r).getLocation();
 			if (loc == null) {
 				logger.info("IResultWithLocation with getLocation()==null, ignoring...");
 				setEmptyLocation(packagedResult);
 			} else {
-				packagedResult.startLNr = loc.getStartLine();
-				packagedResult.endLNr = loc.getEndLine();
-				packagedResult.startCol = loc.getStartColumn();
-				packagedResult.endCol = loc.getEndColumn();
+				packagedResult.setStartLNr(loc.getStartLine());
+				packagedResult.setEndLNr(loc.getEndLine());
+				packagedResult.setStartCol(loc.getStartColumn());
+				packagedResult.setEndCol(loc.getEndColumn());
 			}
 		} else {
 			setEmptyLocation(packagedResult);
 		}
-		packagedResult.shortDesc = String.valueOf(r.getShortDescription());
-		packagedResult.longDesc = String.valueOf(r.getLongDescription());
-		packagedResult.type = type;
+		packagedResult.setShortDesc(r.getShortDescription());
+		packagedResult.setLongDesc(r.getLongDescription());
+		packagedResult.setType(type);
 		return packagedResult;
 	}
 
 	private static void setEmptyLocation(final UltimateResult packagedResult) {
-		packagedResult.startLNr = -1;
-		packagedResult.endLNr = -1;
-		packagedResult.startCol = -1;
-		packagedResult.endCol = -1;
+		packagedResult.setStartLNr(-1);
+		packagedResult.setEndLNr(-1);
+		packagedResult.setStartCol(-1);
+		packagedResult.setEndCol(-1);
 	}
 
 }

@@ -1,13 +1,13 @@
 package de.uni_freiburg.informatik.ultimate.web.backend.util;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.Activator;
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.RcpProgressMonitorWrapper;
@@ -19,18 +19,18 @@ import de.uni_freiburg.informatik.ultimate.core.model.ICore;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchain.ReturnCode;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchainData;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchainProgressMonitor;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.ToolchainResponse;
+import de.uni_freiburg.informatik.ultimate.web.backend.dto.UltimateResult;
 
 public class WebBackendToolchainJob extends DefaultToolchainJob {
 
-	private final JSONObject mResult;
 	private final ServletLogger mServletLogger;
 	private final String mId;
 
 	public WebBackendToolchainJob(final String name, final ICore<RunDefinition> core,
 			final IController<RunDefinition> controller, final ServletLogger logger, final File[] input,
-			final JSONObject result, final String id) {
+			final String id) {
 		super(name, core, controller, logger, input);
-		mResult = result;
 		mServletLogger = logger;
 		mId = id;
 	}
@@ -76,41 +76,34 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 
 	@Override
 	protected IStatus convert(final ReturnCode result) {
+		final ToolchainResponse tcResponse = new ToolchainResponse(getId());
 		switch (result) {
 		case Ok:
 		case Cancel:
 		case Error:
-			try {
-				UltimateResultProcessor.processUltimateResults(mServletLogger,
-						mToolchain.getCurrentToolchainData().getServices(), mResult);
-			} catch (final JSONException ex) {
-				mServletLogger.error("Exception during result conversion", ex);
-				ex.printStackTrace();
-			}
-			storeResults();
+			final List<UltimateResult> results = UltimateResultConverter.processUltimateResults(mServletLogger,
+					mToolchain.getCurrentToolchainData().getServices());
+			tcResponse.setStatus("done");
+			tcResponse.setResults(results);
 			break;
 		default:
+			tcResponse.setStatusError();
 			mServletLogger.error("Unknown return code %s", result);
 			break;
 		}
+
+		try {
+			tcResponse.store(mServletLogger);
+		} catch (final IOException ex) {
+			mServletLogger.error("Could not store toolchain result", ex);
+		}
+
 		return super.convert(result);
 	}
 
 	@Override
 	public boolean belongsTo(final Object family) {
 		return family == "WebBackendToolchainJob";
-	}
-
-	private void storeResults() {
-		try {
-			final JobResult jobResult = new JobResult(mId);
-			mResult.put("status", "done");
-			jobResult.setJson(mResult);
-			jobResult.store();
-			mServletLogger.info("Stored toolchain result to: %s", jobResult.getJsonFile());
-		} catch (final Exception ex) {
-			mServletLogger.error("Error while storing toolchain job result", ex);
-		}
 	}
 
 	public String getId() {
