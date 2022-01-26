@@ -1,5 +1,9 @@
 {
 	"de.uni_freiburg.informatik.ultimate.plugins.analysis.syntaxchecker": [
 		"remove filename from checker output"
+	],
+	"de.uni_freiburg.informatik.ultimate.plugins.generator.cacsl2boogietranslator": [
+		"Check for the main procedure if all allocated memory was freed",
+		"Check absence of signed integer overflows"
 	]
 }
