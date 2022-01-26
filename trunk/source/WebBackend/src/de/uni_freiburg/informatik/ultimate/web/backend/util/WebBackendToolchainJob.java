@@ -1,6 +1,5 @@
 package de.uni_freiburg.informatik.ultimate.web.backend.util;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -16,21 +15,23 @@ import de.uni_freiburg.informatik.ultimate.core.coreplugin.toolchain.DefaultTool
 import de.uni_freiburg.informatik.ultimate.core.lib.toolchain.RunDefinition;
 import de.uni_freiburg.informatik.ultimate.core.model.IController;
 import de.uni_freiburg.informatik.ultimate.core.model.ICore;
+import de.uni_freiburg.informatik.ultimate.core.model.IToolchain;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchain.ReturnCode;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchainData;
 import de.uni_freiburg.informatik.ultimate.core.model.IToolchainProgressMonitor;
+import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.web.backend.dto.ToolchainResponse;
 import de.uni_freiburg.informatik.ultimate.web.backend.dto.UltimateResult;
 
 public class WebBackendToolchainJob extends DefaultToolchainJob {
 
-	private final ServletLogger mServletLogger;
+	private final ILogger mServletLogger;
 	private final String mId;
 
 	public WebBackendToolchainJob(final String name, final ICore<RunDefinition> core,
-			final IController<RunDefinition> controller, final ServletLogger logger, final File[] input,
-			final String id) {
-		super(name, core, controller, logger, input);
+			final IController<RunDefinition> controller, final ILogger logger,
+			final IToolchain<RunDefinition> toolchain, final String id) {
+		super(name, core, controller, logger, toolchain);
 		mServletLogger = logger;
 		mId = id;
 	}
@@ -41,7 +42,6 @@ public class WebBackendToolchainJob extends DefaultToolchainJob {
 		tpm.beginTask(getName(), IProgressMonitor.UNKNOWN);
 
 		try {
-			setToolchain(mCore.requestToolchain(mInputFiles));
 			tpm.worked(1);
 
 			mToolchain.init(tpm);

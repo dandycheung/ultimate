@@ -27,6 +27,7 @@ import de.uni_freiburg.informatik.ultimate.core.model.results.IResult;
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithLocation;
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithSeverity;
 import de.uni_freiburg.informatik.ultimate.core.model.results.IResultWithSeverity.Severity;
+import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
 import de.uni_freiburg.informatik.ultimate.web.backend.dto.UltimateResult;
 
@@ -41,7 +42,7 @@ public class UltimateResultConverter {
 		// do not instantiate utility class
 	}
 
-	public static List<UltimateResult> processUltimateResults(final ServletLogger logger,
+	public static List<UltimateResult> processUltimateResults(final ILogger logger,
 			final IUltimateServiceProvider services) {
 		// get Result from Ultimate
 		final Map<String, List<IResult>> results = services.getResultService().getResults();
@@ -62,7 +63,7 @@ public class UltimateResultConverter {
 		return rtr;
 	}
 
-	private static UltimateResult processResult(final ServletLogger logger, final IResult r) {
+	private static UltimateResult processResult(final ILogger logger, final IResult r) {
 		logger.info("Processing result " + r.getShortDescription());
 		final String type;
 		final String logLvl;
