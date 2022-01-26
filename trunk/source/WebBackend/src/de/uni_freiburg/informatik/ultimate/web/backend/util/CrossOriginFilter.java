@@ -145,44 +145,44 @@ public class CrossOriginFilter implements Filter {
 	private static final List<String> DEFAULT_ALLOWED_HEADERS =
 			Arrays.asList("X-Requested-With", "Content-Type", "Accept", "Origin");
 
-	private boolean anyOriginAllowed;
-	private boolean anyTimingOriginAllowed;
-	private boolean anyHeadersAllowed;
-	private final Set<String> allowedOrigins = new HashSet<>();
-	private final List<Pattern> allowedOriginPatterns = new ArrayList<>();
-	private final Set<String> allowedTimingOrigins = new HashSet<>();
-	private final List<Pattern> allowedTimingOriginPatterns = new ArrayList<>();
-	private final List<String> allowedMethods = new ArrayList<>();
-	private final List<String> allowedHeaders = new ArrayList<>();
-	private final List<String> exposedHeaders = new ArrayList<>();
-	private int preflightMaxAge;
-	private boolean allowCredentials;
-	private boolean chainPreflight;
+	private boolean mAnyOriginAllowed;
+	private boolean mAnyTimingOriginAllowed;
+	private boolean mAnyHeadersAllowed;
+	private final Set<String> mAllowedOrigins = new HashSet<>();
+	private final List<Pattern> mAllowedOriginPatterns = new ArrayList<>();
+	private final Set<String> mAllowedTimingOrigins = new HashSet<>();
+	private final List<Pattern> mAllowedTimingOriginPatterns = new ArrayList<>();
+	private final List<String> mAllowedMethods = new ArrayList<>();
+	private final List<String> mAllowedHeaders = new ArrayList<>();
+	private final List<String> mExposedHeaders = new ArrayList<>();
+	private int mPreflightMaxAge;
+	private boolean mAllowCredentials;
+	private boolean mChainPreflight;
 
 	@Override
 	public void init(final FilterConfig config) throws ServletException {
 		final String allowedOriginsConfig = config.getInitParameter(ALLOWED_ORIGINS_PARAM);
 		final String allowedTimingOriginsConfig = config.getInitParameter(ALLOWED_TIMING_ORIGINS_PARAM);
 
-		anyOriginAllowed = generateAllowedOrigins(allowedOrigins, allowedOriginPatterns, allowedOriginsConfig,
+		mAnyOriginAllowed = generateAllowedOrigins(mAllowedOrigins, mAllowedOriginPatterns, allowedOriginsConfig,
 				DEFAULT_ALLOWED_ORIGINS);
-		anyTimingOriginAllowed = generateAllowedOrigins(allowedTimingOrigins, allowedTimingOriginPatterns,
+		mAnyTimingOriginAllowed = generateAllowedOrigins(mAllowedTimingOrigins, mAllowedTimingOriginPatterns,
 				allowedTimingOriginsConfig, DEFAULT_ALLOWED_TIMING_ORIGINS);
 
 		final String allowedMethodsConfig = config.getInitParameter(ALLOWED_METHODS_PARAM);
 		if (allowedMethodsConfig == null) {
-			allowedMethods.addAll(DEFAULT_ALLOWED_METHODS);
+			mAllowedMethods.addAll(DEFAULT_ALLOWED_METHODS);
 		} else {
-			allowedMethods.addAll(Arrays.asList(StringUtil.csvSplit(allowedMethodsConfig)));
+			mAllowedMethods.addAll(Arrays.asList(StringUtil.csvSplit(allowedMethodsConfig)));
 		}
 
 		final String allowedHeadersConfig = config.getInitParameter(ALLOWED_HEADERS_PARAM);
 		if (allowedHeadersConfig == null) {
-			allowedHeaders.addAll(DEFAULT_ALLOWED_HEADERS);
+			mAllowedHeaders.addAll(DEFAULT_ALLOWED_HEADERS);
 		} else if ("*".equals(allowedHeadersConfig)) {
-			anyHeadersAllowed = true;
+			mAnyHeadersAllowed = true;
 		} else {
-			allowedHeaders.addAll(Arrays.asList(StringUtil.csvSplit(allowedHeadersConfig)));
+			mAllowedHeaders.addAll(Arrays.asList(StringUtil.csvSplit(allowedHeadersConfig)));
 		}
 
 		String preflightMaxAgeConfig = config.getInitParameter(PREFLIGHT_MAX_AGE_PARAM);
@@ -190,7 +190,7 @@ public class CrossOriginFilter implements Filter {
 			preflightMaxAgeConfig = "1800"; // Default is 30 minutes
 		}
 		try {
-			preflightMaxAge = Integer.parseInt(preflightMaxAgeConfig);
+			mPreflightMaxAge = Integer.parseInt(preflightMaxAgeConfig);
 		} catch (final NumberFormatException x) {
 			LOG.info("Cross-origin filter, could not parse '{}' parameter as integer: {}", PREFLIGHT_MAX_AGE_PARAM,
 					preflightMaxAgeConfig);
@@ -200,13 +200,13 @@ public class CrossOriginFilter implements Filter {
 		if (allowedCredentialsConfig == null) {
 			allowedCredentialsConfig = "true";
 		}
-		allowCredentials = Boolean.parseBoolean(allowedCredentialsConfig);
+		mAllowCredentials = Boolean.parseBoolean(allowedCredentialsConfig);
 
 		String exposedHeadersConfig = config.getInitParameter(EXPOSED_HEADERS_PARAM);
 		if (exposedHeadersConfig == null) {
 			exposedHeadersConfig = "";
 		}
-		exposedHeaders.addAll(Arrays.asList(StringUtil.csvSplit(exposedHeadersConfig)));
+		mExposedHeaders.addAll(Arrays.asList(StringUtil.csvSplit(exposedHeadersConfig)));
 
 		String chainPreflightConfig = config.getInitParameter(OLD_CHAIN_PREFLIGHT_PARAM);
 		if (chainPreflightConfig != null) {
@@ -218,7 +218,7 @@ public class CrossOriginFilter implements Filter {
 		if (chainPreflightConfig == null) {
 			chainPreflightConfig = "true";
 		}
-		chainPreflight = Boolean.parseBoolean(chainPreflightConfig);
+		mChainPreflight = Boolean.parseBoolean(chainPreflightConfig);
 
 		if (LOG.isDebugEnabled()) {
 			LOG.debug("Cross-origin filter configuration: " + ALLOWED_ORIGINS_PARAM + " = " + allowedOriginsConfig
@@ -230,7 +230,7 @@ public class CrossOriginFilter implements Filter {
 		}
 	}
 
-	private boolean generateAllowedOrigins(final Set<String> allowedOriginStore,
+	private static boolean generateAllowedOrigins(final Set<String> allowedOriginStore,
 			final List<Pattern> allowedOriginPatternStore, String allowedOriginsConfig, final String defaultOrigin) {
 		if (allowedOriginsConfig == null) {
 			allowedOriginsConfig = defaultOrigin;
@@ -264,7 +264,7 @@ public class CrossOriginFilter implements Filter {
 		final String origin = request.getHeader(ORIGIN_HEADER);
 		// Is it a cross origin request ?
 		if (origin != null && isEnabled(request)) {
-			if (anyOriginAllowed || originMatches(allowedOrigins, allowedOriginPatterns, origin)) {
+			if (mAnyOriginAllowed || originMatches(mAllowedOrigins, mAllowedOriginPatterns, origin)) {
 				if (isSimpleRequest(request)) {
 					LOG.debug("Cross-origin request to {} is a simple cross-origin request", request.getRequestURI());
 					handleSimpleResponse(request, response, origin);
@@ -272,7 +272,7 @@ public class CrossOriginFilter implements Filter {
 					LOG.debug("Cross-origin request to {} is a preflight cross-origin request",
 							request.getRequestURI());
 					handlePreflightResponse(request, response, origin);
-					if (!chainPreflight) {
+					if (!mChainPreflight) {
 						return;
 					}
 					LOG.debug("Preflight cross-origin request to {} forwarded to application", request.getRequestURI());
@@ -282,16 +282,16 @@ public class CrossOriginFilter implements Filter {
 					handleSimpleResponse(request, response, origin);
 				}
 
-				if (anyTimingOriginAllowed
-						|| originMatches(allowedTimingOrigins, allowedTimingOriginPatterns, origin)) {
+				if (mAnyTimingOriginAllowed
+						|| originMatches(mAllowedTimingOrigins, mAllowedTimingOriginPatterns, origin)) {
 					response.setHeader(TIMING_ALLOW_ORIGIN_HEADER, origin);
 				} else {
 					LOG.debug("Cross-origin request to " + request.getRequestURI() + " with origin " + origin
-							+ " does not match allowed timing origins " + allowedTimingOrigins);
+							+ " does not match allowed timing origins " + mAllowedTimingOrigins);
 				}
 			} else {
 				LOG.debug("Cross-origin request to " + request.getRequestURI() + " with origin " + origin
-						+ " does not match allowed origins " + allowedOrigins);
+						+ " does not match allowed origins " + mAllowedOrigins);
 			}
 		}
 
@@ -315,7 +315,7 @@ public class CrossOriginFilter implements Filter {
 		return true;
 	}
 
-	private boolean originMatches(final Set<String> allowedOrigins, final List<Pattern> allowedOriginPatterns,
+	private static boolean originMatches(final Set<String> allowedOrigins, final List<Pattern> allowedOriginPatterns,
 			final String originList) {
 		if (originList.trim().length() == 0) {
 			return false;
@@ -340,13 +340,14 @@ public class CrossOriginFilter implements Filter {
 		return false;
 	}
 
-	private String parseAllowedWildcardOriginToRegex(final String allowedOrigin) {
+	private static String parseAllowedWildcardOriginToRegex(final String allowedOrigin) {
 		final String regex = StringUtil.replace(allowedOrigin, ".", "\\.");
-		return StringUtil.replace(regex, "*", ".*"); // we want to be greedy here to match multiple subdomains, thus we
-														// use .*
+		return StringUtil.replace(regex, "*", ".*");
+		// we want to be greedy here to match multiple subdomains, thus we
+		// use .*
 	}
 
-	private boolean isSimpleRequest(final HttpServletRequest request) {
+	private static boolean isSimpleRequest(final HttpServletRequest request) {
 		final String method = request.getMethod();
 		if (SIMPLE_HTTP_METHODS.contains(method)) {
 			// TODO: implement better detection of simple headers
@@ -358,7 +359,7 @@ public class CrossOriginFilter implements Filter {
 		return false;
 	}
 
-	private boolean isPreflightRequest(final HttpServletRequest request) {
+	private static boolean isPreflightRequest(final HttpServletRequest request) {
 		final String method = request.getMethod();
 		if (!"OPTIONS".equalsIgnoreCase(method)) {
 			return false;
@@ -371,11 +372,11 @@ public class CrossOriginFilter implements Filter {
 		response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER, origin);
 		// W3C CORS spec http://www.w3.org/TR/cors/#resource-implementation
 		response.addHeader("Vary", ORIGIN_HEADER);
-		if (allowCredentials) {
+		if (mAllowCredentials) {
 			response.setHeader(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER, "true");
 		}
-		if (!exposedHeaders.isEmpty()) {
-			response.setHeader(ACCESS_CONTROL_EXPOSE_HEADERS_HEADER, commify(exposedHeaders));
+		if (!mExposedHeaders.isEmpty()) {
+			response.setHeader(ACCESS_CONTROL_EXPOSE_HEADERS_HEADER, commify(mExposedHeaders));
 		}
 	}
 
@@ -393,20 +394,20 @@ public class CrossOriginFilter implements Filter {
 		}
 		response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN_HEADER, origin);
 		// W3C CORS spec http://www.w3.org/TR/cors/#resource-implementation
-		if (!anyOriginAllowed) {
+		if (!mAnyOriginAllowed) {
 			response.addHeader("Vary", ORIGIN_HEADER);
 		}
-		if (allowCredentials) {
+		if (mAllowCredentials) {
 			response.setHeader(ACCESS_CONTROL_ALLOW_CREDENTIALS_HEADER, "true");
 		}
-		if (preflightMaxAge > 0) {
-			response.setHeader(ACCESS_CONTROL_MAX_AGE_HEADER, String.valueOf(preflightMaxAge));
+		if (mPreflightMaxAge > 0) {
+			response.setHeader(ACCESS_CONTROL_MAX_AGE_HEADER, String.valueOf(mPreflightMaxAge));
 		}
-		response.setHeader(ACCESS_CONTROL_ALLOW_METHODS_HEADER, commify(allowedMethods));
-		if (anyHeadersAllowed) {
+		response.setHeader(ACCESS_CONTROL_ALLOW_METHODS_HEADER, commify(mAllowedMethods));
+		if (mAnyHeadersAllowed) {
 			response.setHeader(ACCESS_CONTROL_ALLOW_HEADERS_HEADER, commify(headersRequested));
 		} else {
-			response.setHeader(ACCESS_CONTROL_ALLOW_HEADERS_HEADER, commify(allowedHeaders));
+			response.setHeader(ACCESS_CONTROL_ALLOW_HEADERS_HEADER, commify(mAllowedHeaders));
 		}
 	}
 
@@ -415,14 +416,14 @@ public class CrossOriginFilter implements Filter {
 		LOG.debug("{} is {}", ACCESS_CONTROL_REQUEST_METHOD_HEADER, accessControlRequestMethod);
 		boolean result = false;
 		if (accessControlRequestMethod != null) {
-			result = allowedMethods.contains(accessControlRequestMethod);
+			result = mAllowedMethods.contains(accessControlRequestMethod);
 		}
 		LOG.debug("Method {} is" + (result ? "" : " not") + " among allowed methods {}", accessControlRequestMethod,
-				allowedMethods);
+				mAllowedMethods);
 		return result;
 	}
 
-	private List<String> getAccessControlRequestHeaders(final HttpServletRequest request) {
+	private static List<String> getAccessControlRequestHeaders(final HttpServletRequest request) {
 		final String accessControlRequestHeaders = request.getHeader(ACCESS_CONTROL_REQUEST_HEADERS_HEADER);
 		LOG.debug("{} is {}", ACCESS_CONTROL_REQUEST_HEADERS_HEADER, accessControlRequestHeaders);
 		if (accessControlRequestHeaders == null) {
@@ -441,7 +442,7 @@ public class CrossOriginFilter implements Filter {
 	}
 
 	private boolean areHeadersAllowed(final List<String> requestedHeaders) {
-		if (anyHeadersAllowed) {
+		if (mAnyHeadersAllowed) {
 			LOG.debug("Any header is allowed");
 			return true;
 		}
@@ -449,7 +450,7 @@ public class CrossOriginFilter implements Filter {
 		boolean result = true;
 		for (final String requestedHeader : requestedHeaders) {
 			boolean headerAllowed = false;
-			for (final String allowedHeader : allowedHeaders) {
+			for (final String allowedHeader : mAllowedHeaders) {
 				if (requestedHeader.equalsIgnoreCase(allowedHeader.trim())) {
 					headerAllowed = true;
 					break;
@@ -461,11 +462,11 @@ public class CrossOriginFilter implements Filter {
 			}
 		}
 		LOG.debug("Headers [{}] are" + (result ? "" : " not") + " among allowed headers {}", requestedHeaders,
-				allowedHeaders);
+				mAllowedHeaders);
 		return result;
 	}
 
-	private String commify(final List<String> strings) {
+	private static String commify(final List<String> strings) {
 		final StringBuilder builder = new StringBuilder();
 		for (int i = 0; i < strings.size(); ++i) {
 			if (i > 0) {
@@ -479,15 +480,15 @@ public class CrossOriginFilter implements Filter {
 
 	@Override
 	public void destroy() {
-		anyOriginAllowed = false;
-		anyTimingOriginAllowed = false;
-		allowedOrigins.clear();
-		allowedOriginPatterns.clear();
-		allowedTimingOrigins.clear();
-		allowedTimingOriginPatterns.clear();
-		allowedMethods.clear();
-		allowedHeaders.clear();
-		preflightMaxAge = 0;
-		allowCredentials = false;
+		mAnyOriginAllowed = false;
+		mAnyTimingOriginAllowed = false;
+		mAllowedOrigins.clear();
+		mAllowedOriginPatterns.clear();
+		mAllowedTimingOrigins.clear();
+		mAllowedTimingOriginPatterns.clear();
+		mAllowedMethods.clear();
+		mAllowedHeaders.clear();
+		mPreflightMaxAge = 0;
+		mAllowCredentials = false;
 	}
 }
