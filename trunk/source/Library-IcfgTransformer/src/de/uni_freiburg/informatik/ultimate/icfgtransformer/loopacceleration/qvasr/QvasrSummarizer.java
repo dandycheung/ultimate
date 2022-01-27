@@ -27,16 +27,29 @@
 
 package de.uni_freiburg.informatik.ultimate.icfgtransformer.loopacceleration.qvasr;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.SimultaneousUpdate;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.TransFormulaBuilder;
 import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.UnmodifiableTransFormula;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.UnmodifiableTransFormula.Infeasibility;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.variables.IProgramVar;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.ManagedScript;
+import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtSortUtils;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtUtils;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtUtils.XnfConversionTechnique;
+import de.uni_freiburg.informatik.ultimate.logic.QuantifiedFormula;
 import de.uni_freiburg.informatik.ultimate.logic.Rational;
 import de.uni_freiburg.informatik.ultimate.logic.Term;
+import de.uni_freiburg.informatik.ultimate.logic.TermVariable;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.Pair;
 
 /**
  *
@@ -76,25 +89,123 @@ public class QvasrSummarizer {
 	 * @return A summary of these changes in form of a {@link UnmodifiableTransFormula}
 	 */
 	public UnmodifiableTransFormula summarizeLoop(final UnmodifiableTransFormula transitionFormula) {
-		final Term transitionTerm = transitionFormula.getFormula();
-		final Term transitionTermDnf = SmtUtils.toDnf(mServices, mScript, transitionTerm,
-				XnfConversionTechnique.BOTTOM_UP_WITH_LOCAL_SIMPLIFICATION);
+		final SimultaneousUpdate su;
+		try {
+			su = SimultaneousUpdate.fromTransFormula(transitionFormula, mScript);
+		} catch (final Exception e) {
+			throw new UnsupportedOperationException("Could not compute Simultaneous Update!");
+		}
+		final Map<IProgramVar, TermVariable> inVarsReal = new HashMap<>();
+		final Map<IProgramVar, TermVariable> outVarsReal = new HashMap<>();
+		for (final IProgramVar assVar : su.getDeterministicAssignment().keySet()) {
+			if (transitionFormula.getInVars().containsKey(assVar)) {
+				inVarsReal.put(assVar, transitionFormula.getInVars().get(assVar));
+			} else if (transitionFormula.getOutVars().containsKey(assVar)) {
+				inVarsReal.put(assVar, transitionFormula.getOutVars().get(assVar));
+			}
+			if (transitionFormula.getOutVars().containsKey(assVar)) {
+				outVarsReal.put(assVar, transitionFormula.getOutVars().get(assVar));
+			}
+		}
 
 		final int tfDimension = transitionFormula.getAssignedVars().size();
 		final Rational[][] identityMatrix = QvasrUtils.getIdentityMatrix(tfDimension);
 		QvasrAbstraction bestAbstraction = new QvasrAbstraction(identityMatrix, new Qvasr());
-
-		final QvasrAbstractor qvasrAbstractor = new QvasrAbstractor(mScript, mLogger, mServices);
-
+		final Term transitionTerm = transitionFormula.getFormula();
+		final Term transitionTermDnf = SmtUtils.toDnf(mServices, mScript, transitionTerm,
+				XnfConversionTechnique.BOTTOM_UP_WITH_LOCAL_SIMPLIFICATION);
 		final List<Term> disjuncts = QvasrUtils.splitDisjunction(transitionTermDnf);
 
 		for (final Term disjunct : disjuncts) {
-			final QvasrAbstraction qvasrAbstraction = qvasrAbstractor.computeAbstraction(disjunct, transitionFormula);
-			bestAbstraction = QvasrAbstractionJoin.join(mScript, bestAbstraction, qvasrAbstraction);
+			final UnmodifiableTransFormula disjunctTf = QvasrUtils.buildFormula(transitionFormula, disjunct, mScript);
+			final QvasrAbstraction qvasrAbstraction = QvasrAbstractor.computeAbstraction(mScript, disjunctTf);
+			bestAbstraction = QvasrAbstractionJoin.join(mScript, bestAbstraction, qvasrAbstraction).getThird();
 		}
-		/**
-		 * TODO extract formula from Qvasr.
-		 */
-		return transitionFormula;
+
+		final IntvasrAbstraction intVasrAbstraction = QvasrUtils.qvasrAbstractionToInt(bestAbstraction);
+		return intVasrAbstractionToFormula(mScript, intVasrAbstraction, inVarsReal, outVarsReal);
+	}
+
+	/**
+	 * /** Compute a {@link UnmodifiableTransFormula} as loop summary. This version can deal with branching loops.
+	 *
+	 *
+	 * @param script
+	 *            A {@link ManagedScript}
+	 * @param intvasrAbstraction
+	 *            A {@link QvasrAbstraction} whose reachability relation we want to compute.
+	 *
+	 *
+	 * @param invars
+	 *            Invariables of the original loop formula.
+	 * @param outvars
+	 *            Outvariables of the original loopformula.
+	 * @return An overapproximative loop summary computed from an {@link IntvasrAbstraction}.
+	 */
+	public static UnmodifiableTransFormula intVasrAbstractionToFormula(final ManagedScript script,
+			final IntvasrAbstraction intvasrAbstraction, final Map<IProgramVar, TermVariable> invars,
+			final Map<IProgramVar, TermVariable> outvars) {
+		final Term[] inVarsReal = invars.values().toArray(new Term[invars.size()]);
+		final Term[] outVarsReal = outvars.values().toArray(new Term[outvars.size()]);
+
+		final Map<IProgramVar, TermVariable> newInvars = invars;
+		final Map<IProgramVar, TermVariable> newOutvars = outvars;
+
+		final Term[][] variableRelationsIn = QvasrUtils.matrixVectorMultiplicationWithVariables(script,
+				intvasrAbstraction.getSimulationMatrix(), QvasrUtils.transposeRowToColumnTermVector(inVarsReal));
+		final Term[][] variableRelationsOut = QvasrUtils.matrixVectorMultiplicationWithVariables(script,
+				intvasrAbstraction.getSimulationMatrix(), QvasrUtils.transposeRowToColumnTermVector(outVarsReal));
+
+		final List<Term> qvasrDimensionConjunction = new ArrayList<>();
+
+		final Map<Integer, TermVariable> kToTransformer = new HashMap<>();
+
+		for (int dimension = 0; dimension < intvasrAbstraction.getVasr().getDimension(); dimension++) {
+			final Set<Term> dimensionDisjunction = new HashSet<>();
+			Term dimensionSumTerm = variableRelationsIn[dimension][0];
+			boolean incrementFlag = false;
+			int transformerId = 0;
+			for (final Pair<Integer[], Integer[]> transformer : intvasrAbstraction.getVasr().getTransformer()) {
+				final Integer dimensionReset = transformer.getFirst()[dimension];
+				final Integer dimensionAddition = transformer.getSecond()[dimension];
+				if (dimensionReset == 0) {
+					final Term equality =
+							SmtUtils.binaryEquality(script.getScript(), variableRelationsOut[dimension][0],
+									script.getScript().numeral(dimensionAddition.toString()));
+					dimensionDisjunction.add(equality);
+				} else {
+					TermVariable k;
+					if (kToTransformer.containsKey(transformerId)) {
+						k = kToTransformer.get(transformerId);
+					} else {
+						k = script.constructFreshTermVariable("k", SmtSortUtils.getIntSort(script));
+						kToTransformer.put(transformerId, k);
+					}
+					final Term quantifiedAddition = SmtUtils.mul(script.getScript(), "*",
+							script.getScript().numeral(transformer.getSecond()[dimension].toString()), k);
+					dimensionSumTerm = SmtUtils.sum(script.getScript(), "+", dimensionSumTerm, quantifiedAddition);
+					incrementFlag = true;
+				}
+				transformerId++;
+			}
+			if (incrementFlag) {
+				final Term equality = SmtUtils.binaryEquality(script.getScript(), variableRelationsOut[dimension][0],
+						dimensionSumTerm);
+				dimensionDisjunction.add(equality);
+			}
+			qvasrDimensionConjunction.add(SmtUtils.or(script.getScript(), dimensionDisjunction));
+		}
+
+		for (final Term k : kToTransformer.values()) {
+			final Term kGeqZero = SmtUtils.geq(script.getScript(), k, script.getScript().numeral("0"));
+			qvasrDimensionConjunction.add(kGeqZero);
+		}
+		Term loopSummary = SmtUtils.and(script.getScript(), qvasrDimensionConjunction);
+		loopSummary = SmtUtils.quantifier(script.getScript(), QuantifiedFormula.EXISTS, kToTransformer.values(),
+				SmtUtils.and(script.getScript(), loopSummary));
+		final TransFormulaBuilder tfb = new TransFormulaBuilder(newInvars, newOutvars, true, null, true, null, true);
+		tfb.setFormula(loopSummary);
+		tfb.setInfeasibility(Infeasibility.NOT_DETERMINED);
+		return tfb.finishConstruction(script);
 	}
 }

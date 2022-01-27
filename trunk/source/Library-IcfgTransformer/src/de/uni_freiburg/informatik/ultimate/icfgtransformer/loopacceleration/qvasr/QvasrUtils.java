@@ -27,18 +27,23 @@
 
 package de.uni_freiburg.informatik.ultimate.icfgtransformer.loopacceleration.qvasr;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.TransFormulaBuilder;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.UnmodifiableTransFormula;
+import de.uni_freiburg.informatik.ultimate.lib.modelcheckerutils.cfg.transitions.UnmodifiableTransFormula.Infeasibility;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.ManagedScript;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtSortUtils;
 import de.uni_freiburg.informatik.ultimate.lib.smtlibutils.SmtUtils;
 import de.uni_freiburg.informatik.ultimate.logic.ApplicationTerm;
 import de.uni_freiburg.informatik.ultimate.logic.Rational;
 import de.uni_freiburg.informatik.ultimate.logic.Term;
+import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.Pair;
 
 /**
  *
@@ -129,13 +134,7 @@ public final class QvasrUtils {
 	 * @return The product of both.
 	 */
 	public static Term[][] vectorMatrixMultiplicationWithVariables(final ManagedScript script, final Term[] vector,
-			Rational[][] matrixTwo) {
-		/*
-		 * In case the matrix is a vector.
-		 */
-		if (matrixTwo.length == 1) {
-			matrixTwo = transposeRowToColumnVector(matrixTwo);
-		}
+			final Rational[][] matrixTwo) {
 		final int vectorLength = vector.length;
 		final int rowMatrixTwo = matrixTwo.length;
 		if (vectorLength != rowMatrixTwo) {
@@ -154,6 +153,44 @@ public final class QvasrUtils {
 						matrixTwo[k][j].toTerm(SmtSortUtils.getRealSort(script)));
 				sum = SmtUtils.sum(script.getScript(), "+", sum, mult);
 				resultMatrix[0][j] = sum;
+			}
+		}
+		return resultMatrix;
+	}
+
+	/**
+	 * Standard vector matrix multiplication of a vector containing {@link Term} and a rational matrix. They are not
+	 * associative.
+	 *
+	 * @param script
+	 *            A {@link ManagedScript}
+	 *
+	 * @param vector
+	 *            A vector with {@link Term}
+	 *
+	 * @param matrixTwo
+	 *            A {@link Rational} matrix.
+	 * @return The product of both.
+	 */
+	public static Term[][] matrixVectorMultiplicationWithVariables(final ManagedScript script,
+			final Integer[][] matrixTwo, final Term[][] vector) {
+		final int vectorLength = vector.length;
+		final int colMatrixTwo = matrixTwo[0].length;
+		assert vectorLength == colMatrixTwo;
+		final int rowMatrixTwo = matrixTwo.length;
+
+		final Term[][] resultMatrix = new Term[rowMatrixTwo][1];
+		for (int i = 0; i < rowMatrixTwo; i++) {
+			resultMatrix[i][0] = script.getScript().numeral("0");
+
+		}
+		for (int j = 0; j < rowMatrixTwo; j++) {
+			Term sum = script.getScript().numeral("0");
+			for (int k = 0; k < colMatrixTwo; k++) {
+				final Term mult = SmtUtils.mul(script.getScript(), "*", vector[k][0],
+						script.getScript().numeral(matrixTwo[j][k].toString()));
+				sum = SmtUtils.sum(script.getScript(), "+", sum, mult);
+				resultMatrix[j][0] = sum;
 			}
 		}
 		return resultMatrix;
@@ -183,6 +220,28 @@ public final class QvasrUtils {
 	 */
 	public static boolean isApplicationTerm(final Term term) {
 		return term instanceof ApplicationTerm && ((ApplicationTerm) term).getParameters().length > 0;
+	}
+
+	/**
+	 * Construct a new {@link UnmodifiableTransFormula} from a term. This term is part of the DNF of the original
+	 * formula. There eligible.
+	 *
+	 * @param origin
+	 *            Original {@link UnmodifiableTransFormula}
+	 * @param term
+	 *            Disjunct term of the new formula.
+	 * @param managedScript
+	 *            A {@link ManagedScript}
+	 * @return A new {@link UnmodifiableTransFormula}
+	 */
+	public static UnmodifiableTransFormula buildFormula(final UnmodifiableTransFormula origin, final Term term,
+			final ManagedScript managedScript) {
+		final TransFormulaBuilder tfb =
+				new TransFormulaBuilder(origin.getInVars(), origin.getOutVars(), true, null, true, null, false);
+		tfb.setFormula(term);
+		tfb.addAuxVarsButRenameToFreshCopies(origin.getAuxVars(), managedScript);
+		tfb.setInfeasibility(Infeasibility.NOT_DETERMINED);
+		return tfb.finishConstruction(managedScript);
 	}
 
 	/**
@@ -298,6 +357,21 @@ public final class QvasrUtils {
 	 *            A rational vector to be transposed.
 	 * @return The transposed vector.
 	 */
+	public static Term[][] transposeRowToColumnTermVector(final Term[] vector) {
+		final Term[][] transposedVector = new Term[vector.length][1];
+		for (int i = 0; i < vector.length; i++) {
+			transposedVector[i][0] = vector[i];
+		}
+		return transposedVector;
+	}
+
+	/**
+	 * Transpose a rational row vector to a rational column vector.
+	 *
+	 * @param vector
+	 *            A rational vector to be transposed.
+	 * @return The transposed vector.
+	 */
 	public static Rational[] transposeColumnToRowVector(final Rational[][] vector) {
 		final Rational[] transposedVector = new Rational[vector.length];
 		for (int i = 0; i < vector.length; i++) {
@@ -324,5 +398,67 @@ public final class QvasrUtils {
 			joinedSet.add(varJoin);
 		}
 		return joinedSet;
+	}
+
+	/**
+	 * Convert a given {@link QvasrAbstraction} consisting of {@link Rational} to an {@link IntvasrAbstraction} by
+	 * computing the least common multiple of the simulation matrix and addition vectors, then multiplying the entries
+	 * with it. Resulting in an integral vector addition system.
+	 *
+	 * @param qvasrAbstraction
+	 *            The {@link QvasrAbstraction} that will be converted to an {@link IntvasrAbstraction}
+	 * @return The converted {@link IntvasrAbstraction}
+	 */
+	public static IntvasrAbstraction qvasrAbstractionToInt(final QvasrAbstraction qvasrAbstraction) {
+		BigInteger gcd = BigInteger.ZERO;
+		BigInteger mult = BigInteger.ONE;
+		for (int i = 0; i < qvasrAbstraction.getSimulationMatrix().length; i++) {
+			for (int j = 0; j < qvasrAbstraction.getSimulationMatrix()[0].length; j++) {
+				final Rational rational = qvasrAbstraction.getSimulationMatrix()[i][j];
+				if (!rational.isIntegral()) {
+					gcd = Rational.gcd(gcd, rational.denominator());
+					mult = mult.multiply(rational.denominator());
+				}
+			}
+		}
+		for (final Pair<Rational[], Rational[]> transformer : qvasrAbstraction.getVasr().getTransformer()) {
+			final Rational[] additionVector = transformer.getSecond();
+			for (int k = 0; k < additionVector.length; k++) {
+				if (!additionVector[k].isIntegral()) {
+					gcd = Rational.gcd(gcd, additionVector[k].denominator());
+					mult = mult.multiply(additionVector[k].denominator());
+				}
+			}
+		}
+		if (gcd == BigInteger.ZERO) {
+			gcd = BigInteger.ONE;
+		}
+		BigInteger lcm = mult.divide(gcd);
+		if (lcm.equals(BigInteger.ONE)) {
+			lcm = gcd;
+		}
+		final Integer[][] integerSimulationMatrix = new Integer[qvasrAbstraction
+				.getSimulationMatrix().length][qvasrAbstraction.getSimulationMatrix()[0].length];
+		for (int i = 0; i < integerSimulationMatrix.length; i++) {
+			for (int j = 0; j < integerSimulationMatrix[0].length; j++) {
+				final Rational oldRationalEntry = qvasrAbstraction.getSimulationMatrix()[i][j].mul(lcm);
+				assert oldRationalEntry.isIntegral();
+				integerSimulationMatrix[i][j] = oldRationalEntry.numerator().intValue();
+			}
+		}
+		final Intvasr intVasr = new Intvasr();
+		for (final Pair<Rational[], Rational[]> transformer : qvasrAbstraction.getVasr().getTransformer()) {
+			final Integer[] resetVectorInt = new Integer[transformer.getFirst().length];
+			final Integer[] additionVectorInt = new Integer[transformer.getFirst().length];
+			for (int i = 0; i < transformer.getFirst().length; i++) {
+				assert transformer.getFirst()[i].isIntegral();
+				resetVectorInt[i] = transformer.getFirst()[i].numerator().intValue();
+				final Rational oldRationalEntry = transformer.getSecond()[i].mul(lcm);
+				assert oldRationalEntry.isIntegral();
+				additionVectorInt[i] = oldRationalEntry.numerator().intValue();
+			}
+			intVasr.addTransformer(new Pair<>(resetVectorInt, additionVectorInt));
+		}
+		return new IntvasrAbstraction(integerSimulationMatrix, intVasr);
 	}
 }
