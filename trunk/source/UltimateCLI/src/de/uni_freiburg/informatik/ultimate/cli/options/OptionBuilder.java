@@ -37,7 +37,6 @@ import org.apache.commons.cli.Option.Builder;
 import org.apache.commons.cli.Options;
 
 import de.uni_freiburg.informatik.ultimate.core.coreplugin.preferences.CorePreferenceInitializer;
-import de.uni_freiburg.informatik.ultimate.core.lib.preferences.PreferenceUtil;
 import de.uni_freiburg.informatik.ultimate.core.lib.toolchain.RunDefinition;
 import de.uni_freiburg.informatik.ultimate.core.model.ICore;
 import de.uni_freiburg.informatik.ultimate.core.model.IUltimatePlugin;
@@ -45,6 +44,7 @@ import de.uni_freiburg.informatik.ultimate.core.model.preferences.BaseUltimatePr
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceInitializer;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.UltimatePreferenceItem;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.UltimatePreferenceItem.IUltimatePreferenceItemValidator;
+import de.uni_freiburg.informatik.ultimate.preferencejson.PreferenceUtil;
 import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.Triple;
 
 /**

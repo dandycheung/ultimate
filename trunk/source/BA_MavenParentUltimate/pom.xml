@@ -1,6 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>de.uni_freiburg.informatik.ultimate</groupId>
 	<artifactId>mavenparent</artifactId>
@@ -347,7 +345,7 @@
 				<artifactId>target-platform-configuration</artifactId>
 				<version>${tycho-version}</version>
 				<configuration>
-<!-- 					<filters>
+					<!-- 					<filters>
 						<filter>
 							<type>eclipse-plugin</type>
 							<id>javax.activation</id>
@@ -428,6 +426,8 @@
 				<version>${tycho-version}</version>
 				<configuration>
 					<encoding>${project.build.sourceEncoding}</encoding>
+					<!-- Cannot enable this target until all projects are safely on Java11 compatibility -->
+					<!-- <release>11</release> -->
 				</configuration>
 			</plugin>
 		</plugins>
@@ -511,6 +511,7 @@
 		<module>../JavaCup</module>
 		<module>../JungVisualization</module>
 		<module>../LassoRanker</module>
+		<module>../Library-AcceleratedInterpolation</module>
 		<module>../Library-ApacheCommonsCLI</module>
 		<module>../Library-ApacheCommonsLang</module>
 		<module>../Library-Automata</module>
@@ -519,7 +520,6 @@
 		<module>../Library-CZT</module>
 		<module>../Library-Disruptor</module>
 		<module>../Library-IcfgTransformer</module>
-		<module>../WebBackend</module>
 		<module>../Library-JavaBDD</module>
 		<module>../Library-Jung</module>
 		<module>../Library-LassoRanker</module>
@@ -529,12 +529,12 @@
 		<module>../Library-ojAlgo</module>
 		<module>../Library-PathExpressions</module>
 		<module>../Library-PDR</module>
-		<module>../Library-AcceleratedInterpolation</module>
 		<module>../Library-PEA</module>
-		<module>../Library-SMTLIB</module>
-		<module>../Library-srParse</module>
+		<module>../Library-PreferenceJson</module>
 		<module>../Library-Sifa</module>
+		<module>../Library-SMTLIB</module>
 		<module>../Library-SmtLibUtils</module>
+		<module>../Library-srParse</module>
 		<module>../Library-TraceCheckerUtils</module>
 		<module>../Library-UltimateCore</module>
 		<module>../Library-UltimateModel</module>
@@ -548,21 +548,22 @@
 		<module>../ReqParser</module>
 		<module>../ReqPrinter</module>
 		<module>../ReqToTest</module>
+		<module>../Sifa</module>
 		<module>../SMTInterpol</module>
 		<module>../SmtParser</module>
 		<module>../SMTSolverBridge</module>
 		<module>../SpaceExParser</module>
 		<module>../SyntaxChecker</module>
-		<module>../Sifa</module>
-		<module>../TraceAbstractionConcurrent</module>
 		<module>../TraceAbstraction</module>
+		<module>../TraceAbstractionConcurrent</module>
 		<module>../TraceAbstractionWithAFAs</module>
 		<module>../TreeAutomizer</module>
 		<module>../UltimateCLI</module>
 		<module>../UltimateDeltaDebugger</module>
+		<module>../UltimateEliminatorController</module>
+		<module>../WebBackend</module>
 		<module>../WitnessParser</module>
 		<module>../WitnessPrinter</module>
-		<module>../UltimateEliminatorController</module>
 	</modules>
 
 	<profiles>
