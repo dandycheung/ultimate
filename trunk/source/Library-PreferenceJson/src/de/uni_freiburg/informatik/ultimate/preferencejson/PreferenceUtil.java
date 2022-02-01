@@ -45,6 +45,7 @@ import de.uni_freiburg.informatik.ultimate.core.model.preferences.BaseUltimatePr
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.IPreferenceProvider;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.PreferenceType;
 import de.uni_freiburg.informatik.ultimate.core.model.preferences.UltimatePreferenceItem;
+import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceProvider;
 
 /**
@@ -135,6 +136,12 @@ public final class PreferenceUtil {
 
 			for (final Entry<String, Object> setting : pluginSettings.getValue().entrySet()) {
 				final UltimatePreferenceItem<?> item = pluginPreferenceItems.get(setting.getKey());
+				if (item == null) {
+					final ILogger logger = core.getCoreLoggingService().getLogger(PreferenceUtil.class);
+					logger.error("%s '%s' is not a valid setting (perhaps renamed?)", plugin.getPluginID(),
+							setting.getKey());
+					continue;
+				}
 				frontendSettings.add(
 						createFrontendSetting(pluginSettings.getKey(), setting.getKey(), setting.getValue(), item));
 			}
