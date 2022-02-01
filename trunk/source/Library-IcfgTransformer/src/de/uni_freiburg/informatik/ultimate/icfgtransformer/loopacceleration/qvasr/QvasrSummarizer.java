@@ -72,6 +72,7 @@ public class QvasrSummarizer {
 	private final ManagedScript mScript;
 	private final IUltimateServiceProvider mServices;
 	private final IPredicateUnifier mPredUnifier;
+	private boolean mIsOverapprox;
 
 	/**
 	 * Construct a new ({@link UnmodifiableTransFormula}) summarizer based on rational vector addition systems with
@@ -92,6 +93,7 @@ public class QvasrSummarizer {
 		mScript = script;
 		mServices = services;
 		mPredUnifier = predUnifier;
+		mIsOverapprox = false;
 	}
 
 	/**
@@ -126,12 +128,16 @@ public class QvasrSummarizer {
 		final Term transitionTerm = transitionFormula.getFormula();
 		final Term transitionTermDnf = SmtUtils.toDnf(mServices, mScript, transitionTerm,
 				XnfConversionTechnique.BOTTOM_UP_WITH_LOCAL_SIMPLIFICATION);
-		final List<Term> disjuncts = QvasrUtils.splitDisjunction(transitionTermDnf);
+		final Set<Term> disjuncts = QvasrUtils.splitDisjunction(transitionTermDnf);
 
 		for (final Term disjunct : disjuncts) {
 			final UnmodifiableTransFormula disjunctTf = QvasrUtils.buildFormula(transitionFormula, disjunct, mScript);
 			final QvasrAbstraction qvasrAbstraction = QvasrAbstractor.computeAbstraction(mScript, disjunctTf);
 			bestAbstraction = QvasrAbstractionJoin.join(mScript, bestAbstraction, qvasrAbstraction).getThird();
+		}
+
+		if (bestAbstraction.getVasr().getTransformer().size() > 1) {
+			mIsOverapprox = true;
 		}
 
 		final PredicateTransformer<Term, IPredicate, TransFormula> predTransformer =
@@ -166,7 +172,7 @@ public class QvasrSummarizer {
 		final Term[] outVarsReal = outvars.values().toArray(new Term[outvars.size()]);
 
 		final Map<TermVariable, TermVariable> defaultToOut = new HashMap<>();
-		for (final Entry<IProgramVar, TermVariable> invar : tf.getInVars().entrySet()) {
+		for (final Entry<IProgramVar, TermVariable> invar : invars.entrySet()) {
 			if (tf.getOutVars().containsKey(invar.getKey())) {
 				defaultToOut.put(invar.getKey().getTermVariable(), tf.getOutVars().get(invar.getKey()));
 			} else {
@@ -236,6 +242,8 @@ public class QvasrSummarizer {
 		}
 		final IPredicate guardPred = predUnifier.getTruePredicate();
 		final Term post = predTransformer.strongestPostcondition(guardPred, tf);
+		final Term pre = predTransformer.pre(guardPred, tf);
+
 		final Term postSub = Substitution.apply(script, defaultToOut, post);
 		qvasrDimensionConjunction.add(postSub);
 		Term loopSummary = SmtUtils.and(script.getScript(), qvasrDimensionConjunction);
@@ -246,5 +254,9 @@ public class QvasrSummarizer {
 		tfb.setFormula(loopSummary);
 		tfb.setInfeasibility(Infeasibility.NOT_DETERMINED);
 		return tfb.finishConstruction(script);
+	}
+
+	public boolean isOverapprox() {
+		return mIsOverapprox;
 	}
 }
