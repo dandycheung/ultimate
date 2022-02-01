@@ -52,9 +52,13 @@ import de.uni_freiburg.informatik.ultimate.core.model.services.IUltimateServiceP
  * @author Daniel Dietsch (dietsch@informatik.uni-freiburg.de)
  *
  */
-public class PreferenceUtil {
+public final class PreferenceUtil {
 
 	private static final String PLUGIN_ID_CORE = "de.uni_freiburg.informatik.ultimate.core";
+
+	private PreferenceUtil() {
+		// do not instantiate utility class
+	}
 
 	/**
 	 * Convert the label of an {@link UltimatePreferenceItem} to a unique string that contains the plugin id, no spaces,
