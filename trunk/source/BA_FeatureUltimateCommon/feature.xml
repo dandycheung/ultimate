@@ -222,7 +222,7 @@
          id="org.apache.commons.lang"
          download-size="0"
          install-size="0"
-         version="3.3.2"
+         version="3.12.0"
          unpack="false"/>
 
    <plugin
