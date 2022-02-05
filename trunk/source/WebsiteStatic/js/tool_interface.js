@@ -124,7 +124,7 @@ function set_user_frontend_settings(frontend_settings) {
 		// Todo: implement range, int, ...
 		if (setting.type === 'bool') {
 			$('#' + setting.id).prop('checked', setting.value);
-		}
+		} 
 	});
 }
 
@@ -445,15 +445,15 @@ function get_user_frontend_settings() {
 		// TODO: implement float, ... settings.
 		let setting_input = $('#' + setting.id);
 		switch (setting["type"]) {
-			case "int":
-			case "string":
-				setting["value"] = setting_input.val();
-				break;
 			case "bool":
 				setting["value"] = setting_input.is(':checked');
 				break;
+			case "int":
+			case "string":
+			default:
+				setting["value"] = setting_input.val();
+				break;
 		}
-
 		result.push(setting);
 	});
 
