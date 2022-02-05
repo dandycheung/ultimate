@@ -67,7 +67,7 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 		mCoreStorage = new ToolchainStorage();
 		mLoggingService = mCoreStorage.getLoggingService();
 		mLoggingService.setCurrentControllerID(getPluginID());
-		mLogger = mLoggingService.getControllerLogger();
+		mLogger = mLoggingService.getLogger(UltimateWebCore.class);
 		mSettingsManager = new SettingsManager(mLogger);
 		mSettingsManager.registerPlugin(this);
 		mPluginFactory = new PluginFactory(mSettingsManager, mLogger);
@@ -173,7 +173,7 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 		// TODO: Add timeout to the API request and use it.
 
 		mLogger.info("Apply user settings to run configuration.");
-		final List<Map<String, String>> userSettings = mJobMetadata.get(toolchain.getId()).getUserSettings();
+		final List<Map<String, Object>> userSettings = mJobMetadata.get(toolchain.getId()).getUserSettings();
 		final IUltimateServiceProvider services = toolchain.getCurrentToolchainData().getServices();
 		if (userSettings.isEmpty()) {
 			return services;
@@ -183,23 +183,34 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 		final IUltimateServiceProvider newServices =
 				services.registerPreferenceLayer(UltimateWebCore.class, getRegisteredUltimatePluginIDs());
 
-		for (final Map<String, String> userSetting : userSettings) {
-			final String pluginId = userSetting.get("plugin_id");
-			final String key = userSetting.get("key");
+		for (final Map<String, Object> userSetting : userSettings) {
+			final String pluginId = userSetting.get("plugin_id").toString();
+			final String key = userSetting.get("key").toString();
 
 			// Check if the setting is in the white-list.
 			if (!Config.USER_SETTINGS_WHITELIST.isPluginKeyWhitelisted(pluginId, key)) {
-				mLogger.info("User setting for plugin=%s, key=%s is not in whitelist. Ignoring.", pluginId, key);
+				mLogger.warn("Setting '%s' for plugin %s is not in whitelist.", key, pluginId);
 				continue;
 			}
 
 			// Apply the setting.
-			switch (userSetting.get("type")) {
+			switch (userSetting.get("type").toString()) {
 			case "bool":
 			case "int":
 			case "string":
 			case "real":
-				newServices.getPreferenceProvider(pluginId).put(key, userSetting.get("value"));
+				String valueSource = "value";
+				Object value = userSetting.get(valueSource);
+				if (value == null) {
+					valueSource = "default";
+					value = userSetting.get(valueSource);
+				}
+				if (value == null) {
+					mLogger.info("No value for setting %s '%s'", pluginId, key);
+				} else {
+					newServices.getPreferenceProvider(pluginId).put(key, value);
+					mLogger.info("Set %s %s=%s from '%s'", pluginId, key, value, valueSource);
+				}
 				break;
 			default:
 				mLogger.info("User setting type %s is unknown. Ignoring", userSetting.get("type"));
@@ -210,11 +221,24 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 		return newServices;
 	}
 
-	private List<Map<String, String>> getUserSettingsFromRequest(final Request request) {
+	/**
+	 * Get user settings of the form <code>
+	 * {
+	        "plugin_id": "de.uni_freiburg.informatik.ultimate.plugins.generator.cacsl2boogietranslator",
+	        "default": false,
+	        "visible": false,
+	        "name": "Check if freed pointer was valid",
+	        "id": "cacsl2boogietranslator.check.if.freed.pointer.was.valid",
+	        "type": "bool",
+	        "key": "Check if freed pointer was valid"
+	    }
+	 * </code> from the request.
+	 */
+	private List<Map<String, Object>> getUserSettingsFromRequest(final Request request) {
 		try {
 			final String usParam = request.getSingleParameter("user_settings");
-			final Map<String, List<Map<String, String>>> parsed =
-					new Gson().fromJson(usParam, new TypeToken<Map<String, List<Map<String, String>>>>() {
+			final Map<String, List<Map<String, Object>>> parsed =
+					new Gson().fromJson(usParam, new TypeToken<Map<String, List<Map<String, Object>>>>() {
 					}.getType());
 			return parsed.get("user_settings");
 		} catch (final JsonParseException e) {
@@ -372,10 +396,10 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 		private final String mRequestId;
 		private final long mToolchainId;
 		private final File mToolchainFile;
-		private final List<Map<String, String>> mUserSettings;
+		private final List<Map<String, Object>> mUserSettings;
 
 		public JobMetdata(final String requestId, final long toolchainId, final File toolchainFile,
-				final List<Map<String, String>> userSettings) {
+				final List<Map<String, Object>> userSettings) {
 			mRequestId = requestId;
 			mToolchainId = toolchainId;
 			mToolchainFile = toolchainFile;
@@ -394,7 +418,7 @@ public class UltimateWebCore implements ICore<RunDefinition>, IController<RunDef
 			return mToolchainFile;
 		}
 
-		public List<Map<String, String>> getUserSettings() {
+		public List<Map<String, Object>> getUserSettings() {
 			return mUserSettings;
 		}
 	}

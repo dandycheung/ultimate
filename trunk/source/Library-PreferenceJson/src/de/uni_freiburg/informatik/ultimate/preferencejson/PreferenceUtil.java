@@ -77,7 +77,13 @@ public final class PreferenceUtil {
 		final int lastIdx = pluginId.lastIndexOf('.');
 		final String prefix = lastIdx > 0 ? pluginId.substring(lastIdx + 1) : pluginId;
 		final String unprocessedName = prefix + " " + label;
-		return unprocessedName.replace(":", "").replaceAll("[ ()\"'.]+", ".").toLowerCase(Locale.ENGLISH);
+		final String replaced =
+				unprocessedName.replace(":", "").replaceAll("[ ()\"'.]+", ".").toLowerCase(Locale.ENGLISH);
+		if (replaced.endsWith(".")) {
+			// prevent label ending with '.'
+			return replaced.substring(0, replaced.length() - 1);
+		}
+		return replaced;
 	}
 
 	/**
@@ -228,7 +234,8 @@ public final class PreferenceUtil {
 	 * <ul>
 	 * <li><tt>plugin_id</tt>: The Ultimate plugin ID</li>
 	 * <li><tt>key</tt>: Ultimate key to lookup the setting</li>
-	 * <li><tt>id</tt>: A mandatory unique id for this setting (generated from key and plugin_id)</li>
+	 * <li><tt>id</tt>: A mandatory unique id for this setting (generated from key and plugin_id) that is used to lookup
+	 * UI elements generated from settings</li>
 	 * <li><tt>name</tt>: Settings name displayed in the settings menu (identical to key)</li>
 	 * <li><tt>type</tt>: One of "bool", "int", "string", or "real". Used in the frontend for sliders, checkboxes,
 	 * etc.</li>
@@ -250,7 +257,7 @@ public final class PreferenceUtil {
 		final Map<String, Object> rtr = new HashMap<>(8);
 		rtr.put("plugin_id", pluginId);
 		rtr.put("key", key);
-		rtr.put("id", convertLabelToLongName(pluginId, key));
+		rtr.put("id", convertLabelToLongName(pluginId, key).replace('.', '_'));
 		rtr.put("name", key);
 		rtr.put("visible", false);
 
