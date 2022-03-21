@@ -40,6 +40,10 @@ import de.uni_freiburg.informatik.ultimate.core.model.services.ILogger;
 import de.uni_freiburg.informatik.ultimate.util.DfsBookkeeping;
 import de.uni_freiburg.informatik.ultimate.util.datastructures.DataStructureUtils;
 import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.Pair;
+import de.uni_freiburg.informatik.ultimate.util.statistics.AbstractStatisticsDataProvider;
+import de.uni_freiburg.informatik.ultimate.util.statistics.IStatisticsDataProvider;
+import de.uni_freiburg.informatik.ultimate.util.statistics.KeyType;
+import de.uni_freiburg.informatik.ultimate.util.statistics.StatisticsData;
 
 /**
  * Implements a depth-first traversal of deterministic finite automata.
@@ -62,6 +66,8 @@ public class DepthFirstTraversal<L, S> {
 	private final DfsBookkeeping<S> mDfs = new DfsBookkeeping<>();
 
 	private int mIndentLevel = -1;
+	
+//	private Statistics mStatistics;
 
 	/**
 	 * Performs a depth-first traversal. This constructor is called purely for its side-effects.
@@ -87,19 +93,21 @@ public class DepthFirstTraversal<L, S> {
 		mOperand = operand;
 		mOrder = order;
 		mVisitor = visitor;
-
+//		mStatistics = new Statistics();
 		traverse();
 	}
+	
+
 
 	private void traverse() throws AutomataOperationCanceledException {
 		final S initial = DataStructureUtils.getOneAndOnly(mOperand.getInitialStates(), "initial state");
 		visitState(initial);
-
+		
 		while (!mWorklist.isEmpty()) {
 			if (!mServices.getProgressAwareTimer().continueProcessing()) {
 				throw new AutomataOperationCanceledException(this.getClass());
 			}
-
+//			System.out.println(mStatistics);
 			final var current = mWorklist.pop();
 			final S currentState = current.getFirst();
 
@@ -146,6 +154,7 @@ public class DepthFirstTraversal<L, S> {
 
 		backtrack();
 		mLogger.debug("search completed");
+		
 	}
 
 	private boolean backtrackUntil(final S state) {
@@ -173,7 +182,6 @@ public class DepthFirstTraversal<L, S> {
 		assert !mDfs.isVisited(state) : "must never re-visit state";
 		mIndentLevel++;
 		debugIndent("visiting state %s", state);
-
 		final boolean pruneSuccessors;
 		if (mOperand.isInitial(state)) {
 			debugIndent("-> state is initial");
@@ -203,4 +211,6 @@ public class DepthFirstTraversal<L, S> {
 	private void debugIndent(final String msg, final Object... params) {
 		mLogger.debug("  ".repeat(mIndentLevel) + msg, params);
 	}
+	
+	
 }

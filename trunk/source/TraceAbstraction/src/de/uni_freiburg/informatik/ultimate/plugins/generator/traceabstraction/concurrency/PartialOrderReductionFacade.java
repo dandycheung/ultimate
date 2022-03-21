@@ -26,8 +26,10 @@
  */
 package de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.concurrency;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -90,6 +92,8 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 	private final IPersistentSetChoice<L, IPredicate> mPersistent;
 	private StateSplitter<IPredicate> mStateSplitter;
 	private final IDeadEndStore<IPredicate, IPredicate> mDeadEndStore;
+	
+	private List<StatisticsData> mStatisticsData;
 
 	public PartialOrderReductionFacade(final IUltimateServiceProvider services, final PredicateFactory predicateFactory,
 			final IIcfg<?> icfg, final Collection<? extends IcfgLocation> errorLocs, final PartialOrderMode mode,
@@ -103,6 +107,7 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 		mIndependence = independence;
 		mPersistent = createPersistentSets(icfg, errorLocs);
 		mDeadEndStore = createDeadEndStore();
+		mStatisticsData = new ArrayList<StatisticsData>();
 	}
 
 	private ISleepSetStateFactory<L, IPredicate, IPredicate>
@@ -199,35 +204,38 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 		if (mSleepFactory instanceof SleepSetStateFactoryForRefinement<?>) {
 			((SleepSetStateFactoryForRefinement<?>) mSleepFactory).reset();
 		}
-		visitor = new TraversalStatisticsVisitor<>(visitor);
+		TraversalStatisticsVisitor<L, IPredicate, ?> traversalStatisticsVisitor = new TraversalStatisticsVisitor<>(visitor);
 		switch (mMode) {
 		case SLEEP_DELAY_SET:
-			new SleepSetDelayReduction<>(mAutomataServices, input, mSleepFactory, mIndependence, mDfsOrder, visitor);
+			new SleepSetDelayReduction<>(mAutomataServices, input, mSleepFactory, mIndependence, mDfsOrder, traversalStatisticsVisitor);
 			break;
 		case SLEEP_NEW_STATES:
 			new DepthFirstTraversal<>(mAutomataServices,
-					new MinimalSleepSetReduction<>(input, mSleepFactory, mIndependence, mDfsOrder), mDfsOrder, visitor);
+					new MinimalSleepSetReduction<>(input, mSleepFactory, mIndependence, mDfsOrder), mDfsOrder, traversalStatisticsVisitor);
 			break;
 		case PERSISTENT_SETS:
-			PersistentSetReduction.applyWithoutSleepSets(mAutomataServices, input, mDfsOrder, mPersistent, visitor);
+			PersistentSetReduction.applyWithoutSleepSets(mAutomataServices, input, mDfsOrder, mPersistent, traversalStatisticsVisitor);
 			break;
 		case PERSISTENT_SLEEP_DELAY_SET_FIXEDORDER:
 		case PERSISTENT_SLEEP_DELAY_SET:
 			PersistentSetReduction.applyDelaySetReduction(mAutomataServices, input, mIndependence, mDfsOrder,
-					mPersistent, visitor);
+					mPersistent, traversalStatisticsVisitor);
 			break;
 		case PERSISTENT_SLEEP_NEW_STATES_FIXEDORDER:
 		case PERSISTENT_SLEEP_NEW_STATES:
 			PersistentSetReduction.applyNewStateReduction(mAutomataServices, input, mIndependence, mDfsOrder,
-					mSleepFactory, mPersistent, visitor);
+					mSleepFactory, mPersistent, traversalStatisticsVisitor);
 			break;
 		case NONE:
-			new DepthFirstTraversal<>(mAutomataServices, input, mDfsOrder, visitor);
+			new DepthFirstTraversal<>(mAutomataServices, input, mDfsOrder, traversalStatisticsVisitor);
 			break;
 		default:
 			throw new UnsupportedOperationException("Unsupported POR mode: " + mMode);
 		}
-		visitor.getStatistics();
+
+		final StatisticsData data = new StatisticsData();
+		data.aggregateBenchmarkData(traversalStatisticsVisitor.getStatistics());
+		mStatisticsData.add(data);
 	}
 
 	private IDeadEndStore<IPredicate, IPredicate> createDeadEndStore() {
@@ -279,8 +287,10 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 			mServices.getResultService().reportResult(Activator.PLUGIN_ID,
 					new StatisticsResult<>(Activator.PLUGIN_NAME, "Persistent set benchmarks", persistentData));
 		}
-
-		// TODO report visitor statistics
+		for (StatisticsData singleStatisticsData : mStatisticsData) {
+			mServices.getResultService().reportResult(Activator.PLUGIN_ID,
+					new StatisticsResult<>(Activator.PLUGIN_NAME, "Traversal Statistics Data", singleStatisticsData));
+		}
 	}
 
 	/**
