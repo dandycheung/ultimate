@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import de.uni_freiburg.informatik.ultimate.automata.AutomataLibraryServices;
 import de.uni_freiburg.informatik.ultimate.automata.AutomataOperationCanceledException;
@@ -67,6 +68,8 @@ import de.uni_freiburg.informatik.ultimate.lib.tracecheckutils.independencerelat
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.Activator;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.concurrency.LoopLockstepOrder.PredicateWithLastThread;
 import de.uni_freiburg.informatik.ultimate.util.datastructures.relation.Pair;
+import de.uni_freiburg.informatik.ultimate.util.statistics.AbstractStatisticsDataProvider;
+import de.uni_freiburg.informatik.ultimate.util.statistics.KeyType;
 import de.uni_freiburg.informatik.ultimate.util.statistics.StatisticsData;
 
 /**
@@ -92,8 +95,8 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 	private final IPersistentSetChoice<L, IPredicate> mPersistent;
 	private StateSplitter<IPredicate> mStateSplitter;
 	private final IDeadEndStore<IPredicate, IPredicate> mDeadEndStore;
-	
-	private List<StatisticsData> mStatisticsData;
+
+	private final List<StatisticsData> mStatisticsData;
 
 	public PartialOrderReductionFacade(final IUltimateServiceProvider services, final PredicateFactory predicateFactory,
 			final IIcfg<?> icfg, final Collection<? extends IcfgLocation> errorLocs, final PartialOrderMode mode,
@@ -107,7 +110,7 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 		mIndependence = independence;
 		mPersistent = createPersistentSets(icfg, errorLocs);
 		mDeadEndStore = createDeadEndStore();
-		mStatisticsData = new ArrayList<StatisticsData>();
+		mStatisticsData = new ArrayList<>();
 	}
 
 	private ISleepSetStateFactory<L, IPredicate, IPredicate>
@@ -196,25 +199,29 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 	 *            A visitor that traverses the reduced automaton
 	 * @throws AutomataOperationCanceledException
 	 */
-	public void apply(INwaOutgoingLetterAndTransitionProvider<L, IPredicate> input, IDfsVisitor<L, IPredicate> visitor)
-			throws AutomataOperationCanceledException {
+	public void apply(INwaOutgoingLetterAndTransitionProvider<L, IPredicate> input,
+			final IDfsVisitor<L, IPredicate> visitor) throws AutomataOperationCanceledException {
 		if (mDfsOrder instanceof LoopLockstepOrder<?>) {
 			input = ((LoopLockstepOrder<L>) mDfsOrder).wrapAutomaton(input);
 		}
 		if (mSleepFactory instanceof SleepSetStateFactoryForRefinement<?>) {
 			((SleepSetStateFactoryForRefinement<?>) mSleepFactory).reset();
 		}
-		TraversalStatisticsVisitor<L, IPredicate, ?> traversalStatisticsVisitor = new TraversalStatisticsVisitor<>(visitor);
+		final TraversalStatisticsVisitor<L, IPredicate, ?> traversalStatisticsVisitor =
+				new TraversalStatisticsVisitor<>(visitor);
 		switch (mMode) {
 		case SLEEP_DELAY_SET:
-			new SleepSetDelayReduction<>(mAutomataServices, input, mSleepFactory, mIndependence, mDfsOrder, traversalStatisticsVisitor);
+			new SleepSetDelayReduction<>(mAutomataServices, input, mSleepFactory, mIndependence, mDfsOrder,
+					traversalStatisticsVisitor);
 			break;
 		case SLEEP_NEW_STATES:
 			new DepthFirstTraversal<>(mAutomataServices,
-					new MinimalSleepSetReduction<>(input, mSleepFactory, mIndependence, mDfsOrder), mDfsOrder, traversalStatisticsVisitor);
+					new MinimalSleepSetReduction<>(input, mSleepFactory, mIndependence, mDfsOrder), mDfsOrder,
+					traversalStatisticsVisitor);
 			break;
 		case PERSISTENT_SETS:
-			PersistentSetReduction.applyWithoutSleepSets(mAutomataServices, input, mDfsOrder, mPersistent, traversalStatisticsVisitor);
+			PersistentSetReduction.applyWithoutSleepSets(mAutomataServices, input, mDfsOrder, mPersistent,
+					traversalStatisticsVisitor);
 			break;
 		case PERSISTENT_SLEEP_DELAY_SET_FIXEDORDER:
 		case PERSISTENT_SLEEP_DELAY_SET:
@@ -236,6 +243,11 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 		final StatisticsData data = new StatisticsData();
 		data.aggregateBenchmarkData(traversalStatisticsVisitor.getStatistics());
 		mStatisticsData.add(data);
+
+		final StatisticsData sleepData = new StatisticsData();
+		sleepData.aggregateBenchmarkData(
+				new SleepBlockedStatistics<>((SleepSetStateFactoryForRefinement<L>) mSleepFactory, input));
+		mStatisticsData.add(sleepData);
 	}
 
 	private IDeadEndStore<IPredicate, IPredicate> createDeadEndStore() {
@@ -287,9 +299,38 @@ public class PartialOrderReductionFacade<L extends IIcfgTransition<?>> {
 			mServices.getResultService().reportResult(Activator.PLUGIN_ID,
 					new StatisticsResult<>(Activator.PLUGIN_NAME, "Persistent set benchmarks", persistentData));
 		}
-		for (StatisticsData singleStatisticsData : mStatisticsData) {
+		for (final StatisticsData singleStatisticsData : mStatisticsData) {
 			mServices.getResultService().reportResult(Activator.PLUGIN_ID,
 					new StatisticsResult<>(Activator.PLUGIN_NAME, "Traversal Statistics Data", singleStatisticsData));
+		}
+	}
+
+	private final class SleepBlockedStatistics<L> extends AbstractStatisticsDataProvider {
+		private static final String SLEEP_BLOCKED_STATES = "Sleep-blocked states";
+
+		private final int mSleepBlockedStates;
+
+		public SleepBlockedStatistics(final SleepSetStateFactoryForRefinement<L> sleepFactory,
+				final INwaOutgoingLetterAndTransitionProvider<L, IPredicate> input) {
+			mSleepBlockedStates = computeSleepBlocked(sleepFactory, input);
+
+			declare(SLEEP_BLOCKED_STATES, () -> mSleepBlockedStates, KeyType.COUNTER);
+		}
+
+		private int computeSleepBlocked(final SleepSetStateFactoryForRefinement<L> sleepFactory,
+				final INwaOutgoingLetterAndTransitionProvider<L, IPredicate> input) {
+			int sleepBlockedStates = 0;
+			for (final IPredicate state : sleepFactory.getConstructedStates()) {
+				final IPredicate original = sleepFactory.getOriginalState(state);
+				final Set<L> sleepSet = sleepFactory.getSleepSet(state);
+
+				final Set<L> outgoing = StreamSupport.stream(input.internalSuccessors(original).spliterator(), false)
+						.map(x -> x.getLetter()).collect(Collectors.toSet());
+				if (!outgoing.isEmpty() && sleepSet.containsAll(outgoing)) {
+					sleepBlockedStates++;
+				}
+			}
+			return sleepBlockedStates;
 		}
 	}
 

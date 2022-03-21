@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import de.uni_freiburg.informatik.ultimate.automata.partialorder.CoveringOptimizationVisitor.ICoveringRelation;
 import de.uni_freiburg.informatik.ultimate.automata.partialorder.ISleepSetStateFactory;
@@ -70,6 +71,10 @@ public class SleepSetStateFactoryForRefinement<L> implements ISleepSetStateFacto
 	public SleepSetStateFactoryForRefinement(final PredicateFactory predicateFactory) {
 		super();
 		mEmptyStack = predicateFactory.newEmptyStackPredicate();
+	}
+
+	public Set<IPredicate> getConstructedStates() {
+		return mKnownStates.values().stream().flatMap(m -> m.values().stream()).collect(Collectors.toSet());
 	}
 
 	@Override
