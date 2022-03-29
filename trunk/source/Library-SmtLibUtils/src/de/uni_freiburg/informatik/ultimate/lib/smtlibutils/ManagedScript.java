@@ -61,12 +61,20 @@ public class ManagedScript {
 	private Object mLockOwner;
 
 	public ManagedScript(final IUltimateServiceProvider services, final Script script) {
+		this(services, script, new VariableManager(services));
+	}
+
+	public ManagedScript(final IUltimateServiceProvider services, final Script script, final VariableManager manager) {
 		super();
 		mServices = services;
 		mScript = script;
 		mLogger = mServices.getLoggingService().getLogger(SmtLibUtils.PLUGIN_ID);
-		mVariableManager = new VariableManager();
+		mVariableManager = manager;
 		mSkolemFunctionManager = new SkolemFunctionManager();
+	}
+
+	public VariableManager getVariableManager() {
+		return mVariableManager;
 	}
 
 	public void lock(final Object lockOwner) {
@@ -216,7 +224,7 @@ public class ManagedScript {
 	 *      de.uni_freiburg.informatik.ultimate.logic.Sort)
 	 */
 	public TermVariable constructFreshTermVariable(final String name, final Sort sort) {
-		return mVariableManager.constructFreshTermVariable(name, sort);
+		return mVariableManager.constructFreshTermVariable(name, sort, mScript);
 	}
 
 	/**
@@ -225,7 +233,7 @@ public class ManagedScript {
 	 * @see de.uni_freiburg.informatik.ultimate.lib.smtlibutils.ManagedScript.VariableManager#constructFreshCopy(de.uni_freiburg.informatik.ultimate.logic.TermVariable)
 	 */
 	public TermVariable constructFreshCopy(final TermVariable tv) {
-		return mVariableManager.constructFreshCopy(tv);
+		return mVariableManager.constructFreshCopy(tv, mScript);
 	}
 
 	public Map<TermVariable, TermVariable> constructFreshCopies(final Set<TermVariable> tvs) {
@@ -244,7 +252,7 @@ public class ManagedScript {
 	 *      de.uni_freiburg.informatik.ultimate.logic.Sort)
 	 */
 	public TermVariable variable(final String varname, final Sort sort) {
-		return mVariableManager.variable(varname, sort);
+		return mVariableManager.variable(varname, sort, mScript);
 	}
 
 	/**
@@ -272,7 +280,7 @@ public class ManagedScript {
 	 *
 	 * @author Matthias Heizmann
 	 */
-	private class VariableManager {
+	public static class VariableManager {
 
 		/**
 		 * Counter for the construction of fresh variables.
@@ -284,9 +292,15 @@ public class ManagedScript {
 		 * constructed. Whenever we have to construct a fresh copy of a TermVariable we use the basename of this
 		 * TermVariable to obtain a unique but very similar name for the new copy.
 		 */
-		private final Map<TermVariable, String> mTv2Basename = new HashMap<>();
+		private final Map<String, String> mTv2Basename = new HashMap<>();
 
 		private final Set<String> mVariableNames = new HashSet<>();
+
+		private final ILogger mLogger;
+
+		public VariableManager(final IUltimateServiceProvider services) {
+			mLogger = services.getLoggingService().getLogger(SmtLibUtils.PLUGIN_ID);
+		}
 
 		/**
 		 * Construct "fresh" TermVariables. In mathematical logics a variable is called "fresh" if the variable has not
@@ -301,14 +315,14 @@ public class ManagedScript {
 		 * @return TermVariable whose name is different from the names of all other TermVariable that have been
 		 *         constructed by this object.
 		 */
-		public TermVariable constructFreshTermVariable(final String name, final Sort sort) {
+		public TermVariable constructFreshTermVariable(final String name, final Sort sort, final Script script) {
 			if (name.contains("|")) {
 				throw new IllegalArgumentException("Name contains SMT quote characters " + name);
 			}
 			final Integer newIndex = mTvForBasenameCounter.increment(name);
-			final TermVariable result = mScript.variable("v_" + name + "_" + newIndex, sort);
-			mTv2Basename.put(result, name);
-			return result;
+			final String fullName = "v_" + name + "_" + newIndex;
+			mTv2Basename.put(fullName, name);
+			return script.variable(fullName, sort);
 		}
 
 		/**
@@ -316,27 +330,25 @@ public class ManagedScript {
 		 *
 		 * @see mTv2Basename
 		 */
-		public TermVariable constructFreshCopy(final TermVariable tv) {
-			String basename = mTv2Basename.get(tv);
+		public TermVariable constructFreshCopy(final TermVariable tv, final Script script) {
+			String basename = mTv2Basename.get(tv.getName());
 			if (basename == null) {
 				mLogger.warn("TermVariable " + tv
 						+ " not constructed by VariableManager. Cannot ensure absence of name clashes.");
 				basename = SmtUtils.removeSmtQuoteCharacters(tv.getName());
 			}
-			final TermVariable result = constructFreshTermVariable(basename, tv.getSort());
-			return result;
+			return constructFreshTermVariable(basename, tv.getSort(), script);
 		}
 
 		/**
 		 * Construct variable but check if variable with this name was already constructed.
 		 */
-		public TermVariable variable(final String varname, final Sort sort) {
+		public TermVariable variable(final String varname, final Sort sort, final Script script) {
 			if (mVariableNames.contains(varname)) {
 				throw new IllegalArgumentException("A variable with that name was already constructed: " + varname);
 			}
-			final TermVariable result = mScript.variable(varname, sort);
-			mTv2Basename.put(result, varname);
-			return result;
+			mTv2Basename.put(varname, varname);
+			return script.variable(varname, sort);
 		}
 	}
 

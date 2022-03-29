@@ -86,6 +86,7 @@ import de.uni_freiburg.informatik.ultimate.lib.tracecheckutils.independencerelat
 import de.uni_freiburg.informatik.ultimate.lib.tracecheckutils.independencerelation.abstraction.SpecificVariableAbstraction;
 import de.uni_freiburg.informatik.ultimate.lib.tracecheckutils.independencerelation.abstraction.VariableAbstraction;
 import de.uni_freiburg.informatik.ultimate.lib.tracecheckutils.petrinetlbe.PetriNetLargeBlockEncoding.IPLBECompositionFactory;
+import de.uni_freiburg.informatik.ultimate.logic.Script;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.BasicCegarLoop;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.CegarLoopStatisticsDefinitions;
 import de.uni_freiburg.informatik.ultimate.plugins.generator.traceabstraction.concurrency.LoopLockstepOrder.PredicateWithLastThread;
@@ -325,7 +326,11 @@ public class PartialOrderCegarLoop<L extends IIcfgTransition<?>> extends BasicCe
 	private ManagedScript constructIndependenceScript() {
 		final SolverSettings settings = SolverBuilder.constructSolverSettings()
 				.setSolverMode(SolverMode.External_DefaultMode).setUseExternalSolver(ExternalSolver.Z3, 1000);
-		return mCsToolkit.createFreshManagedScript(mServices, settings, "SemanticIndependence");
+		final Script tcSolver = SolverBuilder.buildAndInitializeSolver(mServices, settings, "SemanticIndependence");
+		final ManagedScript mgdScriptTc =
+				new ManagedScript(mServices, tcSolver, mCsToolkit.getManagedScript().getVariableManager());
+		mCsToolkit.getSmtFunctionsAndAxioms().transferAllSymbols(tcSolver);
+		return mgdScriptTc;
 	}
 
 	private IRefinableAbstraction<NestedWordAutomaton<L, IPredicate>, ?, L> constructAbstraction(
